@@ -1,13 +1,15 @@
 {% from 'icons.html' import icon %}
 <!doctype html>
-<html lang="pt-BR">
+<html lang="pt-BR" data-theme="dark">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#0d2342">
+  <meta name="theme-color" content="#091526">
+  <script>try{const theme=localStorage.getItem('solutec-theme');if(theme==='light'||theme==='dark')document.documentElement.dataset.theme=theme;}catch(e){}</script>
   <title>{% block title %}Solutec · Gestão de máquinas{% endblock %}</title>
   <link rel="icon" type="image/svg+xml" href="{{ url_for('static',filename='favicon.svg') }}">
   <link rel="stylesheet" href="{{ url_for('static',filename='app.css',v=app_version) }}">
+  <link rel="stylesheet" href="{{ url_for('static',filename='premium.css',v=app_version) }}">
   <script src="{{ url_for('static',filename='app.js',v=app_version) }}" defer></script>
 </head>
 <body class="{% if not g.user %}is-login{% endif %}">
@@ -15,7 +17,7 @@
 {% if g.user %}
 <button class="nav-scrim" aria-label="Fechar menu" tabindex="-1"></button>
 <aside class="sidebar" id="navigation" aria-label="Menu principal">
-  <a class="brand" href="{{ url_for('dashboard') }}"><span class="brand-mark">S<span></span></span><span><strong>SOLUTEC<span class="brand-dot">.</span></strong><small>GESTÃO DE MÁQUINAS</small></span></a>
+  <a class="brand" href="{{ url_for('dashboard') }}"><span class="brand-mark">S<span></span><i></i></span><span><strong>SOLUTEC<span class="brand-dot">.</span></strong><small>IMPLEMENTOS AGRÍCOLAS</small></span></a>
   <div class="workspace-chip"><span class="workspace-avatar">{{ 'M' if g.user.role=='admin' else 'R' }}</span><div><strong>{{ 'Solutec Matriz' if g.user.role=='admin' else (g.user.reseller_fantasy or g.user.reseller_razao or 'Revenda') }}</strong><small>{{ 'Visão administrativa' if g.user.role=='admin' else 'Revenda autorizada' }}</small></div><span class="online-dot" title="Sessão ativa"></span></div>
   <div class="nav-label">OPERAÇÃO</div>
   <nav class="side-nav">
@@ -31,7 +33,7 @@
   <div class="sidebar-bottom"><div class="dealer-logo"><img src="{{ url_for('static',filename='logo-brand.png') }}" alt="Bruthor Tratores"></div><div class="account"><span class="account-avatar">{{ g.user.email[0]|upper }}</span><div><strong>{{ 'Administrador' if g.user.role=='admin' else 'Revenda' }}</strong><small title="{{ g.user.email }}">{{ g.user.email }}</small></div><a href="{{ url_for('logout') }}" aria-label="Sair da conta" title="Sair">{{ icon('logout') }}</a></div></div>
 </aside>
 <div class="app-shell">
-  <header class="topbar"><div class="topbar-left"><button type="button" class="menu-toggle icon-button" aria-label="Abrir menu" aria-expanded="false" aria-controls="navigation">{{ icon('menu') }}</button><span class="topbar-title">Central de operações <span>/</span> <strong>Solutec</strong></span></div><div class="topbar-right"><form action="{{ url_for('machines_list') }}" method="get" class="global-search">{{ icon('search') }}<input aria-label="Busca rápida" name="q" placeholder="Buscar no sistema..."><kbd>/</kbd></form><span class="today-chip">{{ today|brdate }}</span></div></header>
+  <header class="topbar"><div class="topbar-left"><button type="button" class="menu-toggle icon-button" aria-label="Abrir menu" aria-expanded="false" aria-controls="navigation">{{ icon('menu') }}</button><span class="topbar-title">Central de operações <span>/</span> <strong>Solutec</strong></span></div><div class="topbar-right"><form action="{{ url_for('machines_list') }}" method="get" class="global-search">{{ icon('search') }}<input aria-label="Busca rápida" name="q" placeholder="Buscar no sistema..."><kbd>/</kbd></form><span class="today-chip">{{ icon('clock') }}{{ today|brdate }}</span><button type="button" class="theme-toggle" data-theme-toggle aria-label="Ativar tema claro" title="Alternar tema"><span class="theme-sun">{{ icon('sun') }}</span><span class="theme-moon">{{ icon('moon') }}</span><span class="theme-label">Tema claro</span></button></div></header>
 {% else %}<div class="public-shell">{% endif %}
 <main class="content" id="main">
   {% with messages=get_flashed_messages(with_categories=true) %}{% for category,message in messages %}<div class="flash {{ category }}" role="status">{{ icon('check' if category=='success' else 'alert') }}<span>{{ message }}</span></div>{% endfor %}{% endwith %}

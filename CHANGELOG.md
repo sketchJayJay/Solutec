@@ -1,3 +1,12 @@
+# Solutec 3.0 - visual renovado
+
+- Nova identidade em azul profundo e laranja, com tema escuro e opção de tema claro.
+- Destaque visual com ilustração de trator, indicadores maiores e atalhos redesenhados.
+- Inventário em cards ou lista, com preferência mantida no navegador.
+- Ficha de máquina com capa, identificação em destaque e documentos organizados.
+- Navegação e botões ajustados para celular, contraste, foco e redução de movimento.
+- Nenhuma alteração cadastral ou migração adicional nesta revisão visual.
+
 # Solutec 2.0 - 16/11/2026
 
 - Interface responsiva em azul, branco e laranja.

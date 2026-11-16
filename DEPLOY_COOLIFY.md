@@ -1,4 +1,4 @@
-# Solutec 2.0 no Coolify
+# Solutec 3.0 no Coolify
 
 ## Escolha do pacote
 

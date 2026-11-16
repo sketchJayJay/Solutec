@@ -867,7 +867,7 @@ def csrf_token():
 
 @app.context_processor
 def interface_helpers():
-    return {'csrf_token':csrf_token, 'today':datetime.date.today(), 'app_version':'2.0'}
+    return {'csrf_token':csrf_token, 'today':datetime.date.today(), 'app_version':'3.0'}
 
 
 @app.template_filter('brdate')

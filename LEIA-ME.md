@@ -1,4 +1,4 @@
-# Solutec 2.0
+# Solutec 3.0
 
 Sistema Flask para matriz e revendas, clientes, máquinas, documentos e ordens de serviço.
 

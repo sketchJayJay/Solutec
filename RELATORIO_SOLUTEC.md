@@ -1,5 +1,15 @@
 # Solutec - revisão de 16/11/2026
 
+## Revisão visual 3.0
+
+Nova direção visual em azul profundo e laranja, com tema escuro por padrão e opção de tema claro. A escolha fica salva no navegador. O painel ganhou uma imagem ilustrativa, números em destaque, indicadores de vínculo calculados a partir do cadastro real e atalhos redesenhados.
+
+O inventário agora tem visualização em cards e em lista. A ficha da máquina recebeu uma capa, série em destaque e áreas mais definidas para proprietário, histórico e documentos. As adaptações também atingem login, clientes, formulários e conferência de cadastros.
+
+Os 94 testes funcionais passaram novamente após a revisão. Também foram verificados por DOM a troca de tema, a preferência de visualização e a abertura/fechamento do menu. A inspeção visual usou renderização estática local; não representa uma validação interativa em navegador de produção.
+
+Esta revisão altera apenas apresentação e preferências locais de visualização. O banco e os PDFs originais continuam preservados.
+
 ## Resultado
 
 Layout renovado em azul, branco e laranja, com navegação lateral no computador, menu e atalhos inferiores no celular. Painel com indicadores, busca, filtros e acesso rápido aos registros que precisam de conferência. A ficha da máquina separa identificação, proprietário, histórico e anexos.

@@ -1,8 +1,63 @@
-{% extends 'base.html' %}{% block title %}Visão geral · Solutec{% endblock %}
+{% extends 'base.html' %}
+{% block title %}Visão geral · Solutec{% endblock %}
 {% block body %}
-<div class="page-header"><div><div class="eyebrow">CENTRAL DE OPERAÇÕES</div><h1>Visão geral<span class="title-dot">.</span></h1><p>Seu dia de trabalho começa com tudo organizado.</p></div><a class="btn primary" href="{{ url_for('machine_new') }}">{{ icon('plus') }}Nova máquina</a></div>
-<section class="hero-panel"><div class="hero-copy"><span class="hero-kicker"><i></i>{{ 'SOLUTEC MATRIZ' if g.user.role=='admin' else (g.user.reseller_fantasy or g.user.reseller_razao) }}</span><h2>Cada máquina.<br>Cada cliente. <em>Tudo conectado.</em></h2><p>Consulte entregas, documentos e o histórico de atendimento<br class="desktop-only"> de cada equipamento em poucos cliques.</p><form action="{{ url_for('machines_list') }}" method="get" class="hero-search">{{ icon('search') }}<input name="q" aria-label="Buscar máquina ou proprietário" placeholder="Nome, série, motor ou nota fiscal"><button type="submit" aria-label="Pesquisar">{{ icon('arrow') }}</button></form></div><div class="hero-art" aria-hidden="true"><span class="art-grid"></span><svg viewBox="0 0 420 260" fill="none"><circle cx="144" cy="184" r="51" stroke="currentColor" stroke-width="2"/><circle cx="144" cy="184" r="32" stroke="currentColor" stroke-width="2"/><circle cx="144" cy="184" r="10" stroke="currentColor" stroke-width="2"/><circle cx="322" cy="199" r="34" stroke="currentColor" stroke-width="2"/><circle cx="322" cy="199" r="20" stroke="currentColor" stroke-width="2"/><path d="M94 132V63h109l35 89h100v13M110 72h83l25 65h-62M171 72v64M95 65l-14-14h136M288 151v-45h14v45M195 183h93M106 226H69M66 234h284M243 152v-12h73M335 161v-10M335 166l15 9v24M77 147h25" stroke="currentColor" stroke-width="3"/><path d="M111 73h80l24 62h-57l-48-13V73Z" fill="currentColor" fill-opacity=".07"/><path d="M251 162h66M251 170h33M251 178h26" stroke="#f9a52b" stroke-width="3"/><path d="M61 48h-16v29M355 222h16v-29" stroke="#f9a52b" stroke-width="2"/><circle cx="61" cy="48" r="3" fill="#f9a52b"/></svg><div class="art-caption"><span class="online-dot"></span>HISTÓRICO · ENTREGA · ASSISTÊNCIA</div></div></section>
-<div class="stats-grid"><a class="stat-card" href="{{ url_for('machines_list') }}"><div class="stat-top"><span>Máquinas cadastradas</span><span class="stat-icon blue">{{ icon('machine') }}</span></div><strong class="stat-value">{{ total_machines }}</strong><small>{{ total_machines-report.orphan_machines|length }} com proprietário{% if report.orphan_machines %} · {{ report.orphan_machines|length }} a conferir{% endif %}</small></a><a class="stat-card" href="{{ url_for('clients_list') }}"><div class="stat-top"><span>Clientes</span><span class="stat-icon teal">{{ icon('users') }}</span></div><strong class="stat-value">{{ total_clients }}</strong><small>Proprietários e locais de entrega</small></a><a class="stat-card" href="{{ url_for('clients_list') }}"><div class="stat-top"><span>Ordens de serviço</span><span class="stat-icon purple">{{ icon('file') }}</span></div><strong class="stat-value">{{ total_orders }}</strong><small>Histórico dos atendimentos</small></a><a class="stat-card" href="{{ url_for('machines_list',status='review') }}"><div class="stat-top"><span>Cadastros a conferir</span><span class="stat-icon orange">{{ icon('alert') }}</span></div><strong class="stat-value">{{ report.review_machines|length }}</strong><small>Vínculos ou identificadores repetidos</small></a></div>
-{% if report.orphan_machines %}<div class="notice"><span class="notice-icon">{{ icon('alert') }}</span><div><strong>{{ report.orphan_machines|length }} máquina sem proprietário identificado</strong><p>Esse cadastro já estava no banco, mas ficava oculto na listagem. Confira o vínculo e os possíveis registros repetidos.</p></div><a class="btn" href="{{ url_for('machines_list',status='orphan') }}">Conferir {{ icon('arrow') }}</a></div>{% endif %}
-<div class="dashboard-columns"><section class="card"><div class="section-header"><div><h2>Últimos cadastros</h2><p class="section-sub">Máquinas adicionadas recentemente</p></div><a class="text-link" href="{{ url_for('machines_list') }}">Ver todas {{ icon('arrow') }}</a></div>{% if last_machines %}<table class="table recent-table"><thead><tr><th>Máquina / proprietário</th><th>Série</th><th>Entrega</th><th></th></tr></thead><tbody>{% for m in last_machines %}<tr><td><a class="record-title" href="{{ url_for('machine_detail',machine_id=m.id) }}"><span class="mini-machine">{{ icon('machine') }}</span><span><strong>{{ m.name }}</strong><small>{{ m.client_name or 'Proprietário não identificado' }}</small></span></a></td><td class="mono">{{ m.serial_number or '—' }}</td><td>{{ m.delivery_date|brdate }}</td><td><a class="row-arrow" href="{{ url_for('machine_detail',machine_id=m.id) }}" aria-label="Abrir máquina {{ m.id }}">{{ icon('arrow') }}</a></td></tr>{% endfor %}</tbody></table>{% else %}<div class="empty-state">{{ icon('machine') }}<h3>Vamos começar?</h3><p>Cadastre o primeiro cliente e a máquina vinculada a ele.</p><a href="{{ url_for('client_new') }}" class="btn primary">Cadastrar cliente</a></div>{% endif %}</section><div class="dashboard-side"><section class="card quick-card"><div class="eyebrow">FACILITE SEU DIA</div><h2>O que vamos fazer?</h2><a href="{{ url_for('client_new') }}" class="quick-link"><span class="stat-icon teal">{{ icon('users') }}</span><span><strong>Novo cliente</strong><small>Proprietário e localização</small></span>{{ icon('arrow') }}</a><a href="{{ url_for('machine_new') }}" class="quick-link"><span class="stat-icon blue">{{ icon('machine') }}</span><span><strong>Cadastrar máquina</strong><small>Série, motor e entrega</small></span>{{ icon('arrow') }}</a><a href="{{ url_for('clients_list') }}" class="quick-link"><span class="stat-icon purple">{{ icon('file') }}</span><span><strong>Registrar atendimento</strong><small>Abra o cliente e gere a OS</small></span>{{ icon('arrow') }}</a></section>{% if g.user.role=='admin' %}<a href="{{ url_for('diagnostics') }}" class="integrity-card">{{ icon('check') }}<h3>Um cadastro bem cuidado<br>faz a diferença.</h3><p>Confira vínculos e documentos para manter sua operação organizada.</p><span>Conferir cadastros {{ icon('arrow') }}</span></a>{% endif %}<section class="card access-card"><details><summary>{{ icon('pin') }}Acesse pelo celular</summary><div class="qr-content"><img src="{{ url_for('access_qr') }}" alt="QR Code para acessar a Solutec"><p>Abra a câmera do celular e leia o QR Code.<strong>{{ base_url }}</strong></p></div></details></section></div></div>
+{% set linked=total_machines-report.orphan_machines|length %}
+{% set linked_percent=((linked/total_machines)*100)|round|int if total_machines else 0 %}
+<div class="page-header">
+  <div><div class="eyebrow">SOLUTEC · CENTRAL DE OPERAÇÕES</div><h1>Visão geral<span class="title-dot">.</span></h1><p>Uma visão completa de quem confia no seu trabalho.</p></div>
+  <a class="btn primary" href="{{ url_for('machine_new') }}">{{ icon('plus') }}Nova máquina</a>
+</div>
+<section class="command-hero">
+  <div class="command-image" aria-hidden="true"></div>
+  <div class="command-copy">
+    <span class="command-kicker"><i></i>{{ 'MATRIZ SOLUTEC' if g.user.role=='admin' else (g.user.reseller_fantasy or g.user.reseller_razao) }}</span>
+    <h2>Máquinas no campo.<br><em>Gestão no comando.</em></h2>
+    <p>Equipamentos, clientes e assistência.<br>O histórico certo, na hora em que você precisa.</p>
+    <form action="{{ url_for('machines_list') }}" method="get" class="command-search">
+      {{ icon('search') }}<input name="q" aria-label="Buscar máquina ou proprietário" placeholder="Cliente, série, motor ou nota fiscal"><button type="submit" aria-label="Pesquisar">{{ icon('arrow') }}</button>
+    </form>
+    <div class="command-tags"><span>INVENTÁRIO</span><b></b><span>DOCUMENTOS</span><b></b><span>ASSISTÊNCIA</span></div>
+  </div>
+  <div class="hero-corner"><span class="corner-cross">+</span><span>SOLUTEC<br><strong>GESTÃO EM MOVIMENTO</strong></span></div>
+  <span class="hero-edge" aria-hidden="true"></span>
+</section>
+<div class="stats-grid premium-stats">
+  {% for label,value,sub,kind,icon_name,link in [
+    ('Máquinas cadastradas',total_machines,(linked|string) ~ ' com proprietário · ' ~ (report.orphan_machines|length|string) ~ ' a conferir','blue','machine',url_for('machines_list')),
+    ('Clientes atendidos',total_clients,'Proprietários e locais de entrega','teal','users',url_for('clients_list')),
+    ('Ordens de serviço',total_orders,'Histórico dos atendimentos','purple','file',url_for('clients_list')),
+    ('Cadastros a conferir',report.review_machines|length,'Vínculos e identificadores repetidos','orange','alert',url_for('machines_list',status='review'))
+  ] %}
+  <a class="stat-card stat-{{ kind }}" href="{{ link }}">
+    <div class="stat-top"><span>{{ label }}</span><span class="stat-open">{{ icon('arrow') }}</span></div>
+    <div class="stat-main"><strong class="stat-value">{{ '%02d'|format(value) }}</strong><span class="stat-icon {{ kind }}">{{ icon(icon_name) }}</span></div>
+    <div class="stat-bottom"><span class="stat-dot"></span><small>{{ sub }}</small></div>
+  </a>
+  {% endfor %}
+</div>
+<section class="quick-actions" aria-label="Acesso rápido">
+  <a href="{{ url_for('client_new') }}"><span class="quick-symbol teal">{{ icon('users') }}</span><span><small>RELACIONAMENTO</small><strong>Novo cliente</strong></span>{{ icon('plus') }}</a>
+  <a href="{{ url_for('machine_new') }}"><span class="quick-symbol blue">{{ icon('machine') }}</span><span><small>INVENTÁRIO</small><strong>Cadastrar máquina</strong></span>{{ icon('plus') }}</a>
+  <a href="{{ url_for('clients_list') }}"><span class="quick-symbol orange">{{ icon('file') }}</span><span><small>ASSISTÊNCIA</small><strong>Registrar atendimento</strong></span>{{ icon('arrow') }}</a>
+</section>
+{% if report.orphan_machines %}
+<div class="notice attention-banner"><span class="notice-icon">{{ icon('alert') }}</span><div><strong>{{ report.orphan_machines|length }} máquina sem proprietário identificado</strong><p>O cadastro foi preservado. Confira o cliente e os identificadores antes de fazer qualquer alteração.</p></div><a class="btn" href="{{ url_for('machines_list',status='orphan') }}">Conferir cadastro {{ icon('arrow') }}</a></div>
+{% endif %}
+<div class="dashboard-columns">
+  <section class="card latest-card">
+    <div class="section-header"><div><div class="eyebrow">SEU INVENTÁRIO</div><h2>Últimas máquinas<span class="title-dot">.</span></h2><p class="section-sub">Os equipamentos adicionados recentemente</p></div><a class="text-link" href="{{ url_for('machines_list') }}">Ver todas {{ icon('arrow') }}</a></div>
+    {% if last_machines %}
+    <table class="table recent-table"><thead><tr><th>Equipamento / proprietário</th><th>Número de série</th><th>Entrega</th><th></th></tr></thead><tbody>
+    {% for m in last_machines %}<tr><td data-label="Equipamento"><a class="record-title" href="{{ url_for('machine_detail',machine_id=m.id) }}"><span class="mini-machine">{{ icon('machine') }}</span><span><strong>{{ m.name }}</strong><small>{{ m.client_name or 'Proprietário não identificado' }}</small></span></a></td><td data-label="Série"><span class="serial-chip">{{ m.serial_number or '—' }}</span></td><td data-label="Entrega">{{ m.delivery_date|brdate }}</td><td><a class="row-arrow" href="{{ url_for('machine_detail',machine_id=m.id) }}" aria-label="Abrir máquina {{ m.id }}">{{ icon('arrow') }}</a></td></tr>{% endfor %}
+    </tbody></table>
+    {% else %}<div class="empty-state">{{ icon('machine') }}<h3>Seu inventário começa aqui</h3><p>Cadastre o primeiro cliente e a máquina vinculada a ele.</p><a href="{{ url_for('client_new') }}" class="btn primary">Cadastrar cliente</a></div>{% endif %}
+  </section>
+  <div class="dashboard-side">
+    <section class="card care-card"><div class="eyebrow">ORGANIZAÇÃO DO CADASTRO</div><div class="care-top"><h2>Cada máquina,<br>um proprietário.</h2><span class="care-icon">{{ icon('check') }}</span></div>
+      <div class="ownership-meter"><div class="ownership-ring" style="--percentage:{{ linked_percent }}%"><span><strong>{{ linked_percent }}<small>%</small></strong><em>com cliente</em></span></div><div><strong>{{ linked }} de {{ total_machines }}</strong><p>máquinas ativas com<br>proprietário vinculado</p></div></div>
+      <div class="care-bottom"><span>{{ report.review_machines|length }} máquinas a conferir</span><a href="{{ url_for('diagnostics') if g.user.role=='admin' else url_for('machines_list',status='review') }}" aria-label="Conferir cadastros">{{ icon('arrow') }}</a></div>
+    </section>
+    <section class="access-card card"><details><summary>{{ icon('pin') }}Leve a Solutec com você<span>+</span></summary><div class="qr-content"><img src="{{ url_for('access_qr') }}" alt="QR Code para acessar a Solutec"><p>Abra a câmera do celular e leia o QR Code.<strong>{{ base_url }}</strong></p></div></details></section>
+  </div>
+</div>
 {% endblock %}
