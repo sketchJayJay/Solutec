@@ -9,9 +9,10 @@ services:
       SOLUTEC_DATA_DIR: /data
       SOLUTEC_UPLOAD_DIR: /data/uploads
       SECRET_KEY: ${SECRET_KEY:?Defina SECRET_KEY no .env}
-      COOKIE_SECURE: "true"
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-solutec.divinomg@gmail.com}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-ChangeMe-Now-2026!}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      RESET_ADMIN_PASSWORD: ${RESET_ADMIN_PASSWORD:-false}
     volumes:
       - solutec_data:/data
 volumes:

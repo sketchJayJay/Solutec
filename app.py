@@ -1,7 +1,10 @@
-from flask import Flask, render_template, request, redirect, url_for, flash, session, g, send_from_directory
+from flask import Flask, render_template, request, redirect, url_for, flash, session, g, send_from_directory, send_file, abort
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.middleware.proxy_fix import ProxyFix
 import sqlite3, os, datetime, urllib.parse, re
+import secrets, hmac, math, uuid, tempfile, zipfile, json
+from pathlib import Path
+from maintenance import audit, machine_rows, normalized, search_text, attachment_path, snapshot
 
 BASEDIR = os.path.abspath(os.path.dirname(__file__))
 DATA_DIR = os.environ.get("SOLUTEC_DATA_DIR", os.path.join(BASEDIR, "data"))
@@ -22,7 +25,32 @@ if os.path.isdir(SEED_UPLOADS) and not os.listdir(UPLOAD_DIR):
     shutil.copytree(SEED_UPLOADS, UPLOAD_DIR, dirs_exist_ok=True)
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "CHANGE-ME-IN-COOLIFY")
+# Uma chave local persistente evita sessões previsíveis quando o ambiente não a definiu.
+def session_key():
+    configured = os.environ.get("SECRET_KEY", "").strip()
+    if configured and configured != "CHANGE-ME-IN-COOLIFY":
+        return configured
+    path = Path(DATA_DIR) / ".session-key"
+    if path.exists():
+        return path.read_text().strip()
+    # Publicação atômica: dois workers nunca leem uma chave parcialmente escrita.
+    temporary = Path(DATA_DIR) / (".session-key-" + secrets.token_hex(8))
+    key = secrets.token_hex(32)
+    fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+    try:
+        with os.fdopen(fd, "w") as file:
+            file.write(key)
+            file.flush()
+            os.fsync(file.fileno())
+        try:
+            os.link(temporary, path)
+        except FileExistsError:
+            pass
+    finally:
+        temporary.unlink(missing_ok=True)
+    return path.read_text().strip()
+
+app.secret_key = session_key()
 app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
@@ -51,17 +79,12 @@ def build_maps_url(raw):
 
 
 def normalize_phone(raw_phone):
-    """Normaliza telefone para formato wa.me (somente dígitos, com DDI 55 se faltar)."""
-    if not raw_phone:
-        return None
-    digits = re.sub(r"\D+", "", str(raw_phone))
-    digits = digits.lstrip("0")
-    if not digits:
-        return None
-    # Se não veio com DDI, assume Brasil (55) quando parece um número válido (10/11 dígitos).
-    if not digits.startswith("55") and len(digits) in (10, 11):
-        digits = "55" + digits
-    return digits
+    digits = re.sub(r"\D+", "", str(raw_phone or "")).lstrip("0")
+    if len(digits) in (10, 11):
+        return "55" + digits
+    if len(digits) in (12, 13) and digits.startswith("55"):
+        return digits
+    return None
 
 
 def whatsapp_url(phone, name=None, text=None):
@@ -87,22 +110,22 @@ def inject_helpers():
 # ---------- DB helpers ----------
 
 def connect():
-    # timeout: espera alguns segundos se o banco estiver em uso
     con = sqlite3.connect(DB_PATH, timeout=30)
     con.row_factory = sqlite3.Row
-    con.execute("PRAGMA foreign_keys = ON")
-    # reduz problemas de 'database is locked'
-    try:
-        con.execute("PRAGMA journal_mode=WAL;")
-        con.execute("PRAGMA busy_timeout = 5000;")
-        print("[DEBUG] connect() usando banco:", DB_PATH)
-    except Exception:
-        # Se der qualquer erro aqui, não quebra a app
-        pass
+    con.execute("PRAGMA foreign_keys=ON")
+    con.execute("PRAGMA busy_timeout=10000")
+    con.execute("PRAGMA journal_mode=WAL")
+    con.create_function("fold", 1, search_text, deterministic=True)
     return con
 
 
 def init_db():
+    if os.path.isfile(DB_PATH):
+        probe = sqlite3.connect(DB_PATH)
+        columns = {r[1] for r in probe.execute("PRAGMA table_info(machines)")}
+        probe.close()
+        if columns and not {"obs", "archived_at", "archive_reason"}.issubset(columns):
+            snapshot(DB_PATH, os.path.join(DATA_DIR, "backups"), "antes-atualizacao")
     con = connect()
     cur = con.cursor()
     cur.executescript("""
@@ -162,7 +185,9 @@ def init_db():
         engine_number TEXT,
         delivery_date TEXT,
         initial_hours REAL,
-        obs_text TEXT,
+        obs TEXT,
+        archived_at TEXT,
+        archive_reason TEXT,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (reseller_id) REFERENCES resellers(id) ON DELETE CASCADE,
         FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
@@ -185,6 +210,8 @@ def init_db():
         address TEXT,
         maps_url TEXT,
         obs TEXT,
+        archived_at TEXT,
+        archive_reason TEXT,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (reseller_id) REFERENCES resellers(id) ON DELETE CASCADE,
         FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE,
@@ -197,6 +224,26 @@ def init_db():
         item_text TEXT NOT NULL,
         FOREIGN KEY (order_id) REFERENCES service_orders(id) ON DELETE CASCADE
     );
+    """)
+
+    # Migrações aditivas: não altera nem exclui os cadastros legados.
+    columns = {r["name"] for r in cur.execute("PRAGMA table_info(machines)")}
+    for name, kind in (("obs", "TEXT"), ("archived_at", "TEXT"), ("archive_reason", "TEXT")):
+        if name not in columns:
+            cur.execute(f"ALTER TABLE machines ADD COLUMN {name} {kind}")
+    if "obs_text" in columns:
+        cur.execute("UPDATE machines SET obs=obs_text WHERE obs IS NULL AND obs_text IS NOT NULL")
+    cur.executescript("""
+        CREATE TABLE IF NOT EXISTS maintenance_events(
+            id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER,
+            action TEXT NOT NULL, record_id INTEGER, details TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE INDEX IF NOT EXISTS idx_machines_client ON machines(client_id);
+        CREATE INDEX IF NOT EXISTS idx_machines_reseller ON machines(reseller_id);
+        CREATE INDEX IF NOT EXISTS idx_clients_reseller ON clients(reseller_id);
+        CREATE INDEX IF NOT EXISTS idx_orders_client ON service_orders(client_id);
+        CREATE INDEX IF NOT EXISTS idx_photos_machine ON machine_photos(machine_id);
     """)
 
     # --- Migração leve: adiciona coluna phone em clients (caso o banco seja antigo)
@@ -216,7 +263,7 @@ def init_db():
 
     # Ensure admin reseller + user com login oficial Solutec
     admin_email = os.environ.get("ADMIN_EMAIL", "solutec.divinomg@gmail.com").strip().lower()
-    admin_password = os.environ.get("ADMIN_PASSWORD", "ChangeMe-Now-2026!")
+    admin_password = os.environ.get("ADMIN_PASSWORD", "")
 
     # Matriz Solutec
     cur.execute("SELECT id FROM resellers WHERE razao_social = ?", ("Solutec Matriz",))
@@ -243,11 +290,17 @@ def init_db():
     if u:
         # Permite uma redefinição explícita e pontual pelo ambiente do Coolify.
         if os.environ.get("RESET_ADMIN_PASSWORD", "false").lower() == "true":
+            if not admin_password:
+                con.close()
+                raise RuntimeError("Defina ADMIN_PASSWORD para redefinir a senha do administrador.")
             cur.execute(
                 "UPDATE users SET email = ?, password_hash = ? WHERE id = ?",
                 (admin_email, generate_password_hash(admin_password), u["id"])
             )
     else:
+        if not admin_password:
+            con.close()
+            raise RuntimeError("Defina ADMIN_PASSWORD na primeira inicialização de um banco vazio.")
         cur.execute("""
             INSERT INTO users(email, password_hash, role, reseller_id)
             VALUES (?,?,?,?)
@@ -262,6 +315,8 @@ def init_db():
 @app.before_request
 def load_user():
     g.user = None
+    if request.endpoint in ("health", "static"):
+        return
     user_id = session.get("user_id")
     if user_id:
         con = connect()
@@ -275,8 +330,10 @@ def load_user():
         """, (user_id,))
         row = cur.fetchone()
         con.close()
-        if row:
+        if row and row['role'] in ('admin','revenda') and (row['role']=='admin' or (row['reseller_id'] is not None and row['reseller_razao'] is not None)):
             g.user = row
+        else:
+            session.clear()
 
 
 def login_required(view):
@@ -303,7 +360,13 @@ def admin_required(view):
 
 @app.route("/health")
 def health():
-    return {"status": "ok"}, 200
+    try:
+        con=sqlite3.connect(Path(DB_PATH).resolve().as_uri()+'?mode=ro',uri=True,timeout=5)
+        con.execute('SELECT id FROM machines LIMIT 1')
+        con.close()
+        return {"status":"ok"},200
+    except sqlite3.Error:
+        return {"status":"unavailable"},503
 
 
 # ---------- Routes ----------
@@ -312,68 +375,32 @@ def health():
 @login_required
 def dashboard():
     con = connect()
-    cur = con.cursor()
-
-    # A revenda enxerga somente os próprios indicadores.
-    if g.user["role"] == "revenda":
-        cur.execute("SELECT COUNT(*) FROM machines WHERE reseller_id = ?", (g.user["reseller_id"],))
-        total_machines = cur.fetchone()[0]
-        cur.execute("SELECT COUNT(*) FROM clients WHERE reseller_id = ?", (g.user["reseller_id"],))
-        total_clients = cur.fetchone()[0]
-    else:
-        cur.execute("SELECT COUNT(*) FROM machines")
-        total_machines = cur.fetchone()[0]
-        cur.execute("SELECT COUNT(*) FROM clients")
-        total_clients = cur.fetchone()[0]
-
-    # Listagem curta de últimas máquinas (respeitando permissão da revenda)
-    where = ""
-    params = []
-    if g.user["role"] == "revenda":
-        where = "WHERE m.reseller_id = ?"
-        params.append(g.user["reseller_id"])
-
-    cur.execute(f"""
-        SELECT m.id, m.name, c.name as client_name, m.serial_number,
-               m.delivery_date, r.razao_social as reseller_name
-        FROM machines m
-        JOIN clients c ON c.id = m.client_id
-        JOIN resellers r ON r.id = m.reseller_id
-        {where}
-        ORDER BY m.created_at DESC
-        LIMIT 6
-    """, params)
-    last_machines = cur.fetchall()
-
-    # Flag de primeira utilização (sem clientes nem máquinas)
-    first_run = (total_machines == 0 and total_clients == 0)
-
+    report = audit(con, UPLOAD_DIR, scope_id())
+    where, params = (" WHERE reseller_id=?", [scope_id()]) if scope_id() is not None else ("", [])
+    total_clients = con.execute("SELECT COUNT(*) FROM clients" + where, params).fetchone()[0]
+    total_orders = con.execute("SELECT COUNT(*) FROM service_orders" + where, params).fetchone()[0]
+    total_resellers = con.execute("SELECT COUNT(*) FROM resellers").fetchone()[0] if g.user['role']=='admin' else None
     con.close()
-    return render_template(
-        "dashboard.html",
-        total_machines=total_machines,
-        total_clients=total_clients,
-        last_machines=last_machines,
-        first_run=first_run,
-    )
+    return render_template("dashboard.html", total_machines=len(report['active']),
+        total_clients=total_clients, total_orders=total_orders, total_resellers=total_resellers,
+        last_machines=report['active'][:5], report=report,
+        first_run=not total_clients and not report['active'])
 
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
     if request.method == "POST":
-        email = request.form.get("email","").strip().lower()
-        password = request.form.get("password","")
         con = connect()
-        cur = con.cursor()
-        cur.execute("SELECT * FROM users WHERE email = ?", (email,))
-        user = cur.fetchone()
+        user = con.execute("SELECT * FROM users WHERE lower(email)=?", (request.form.get("email", "").strip().lower(),)).fetchone()
         con.close()
-        if not user or not check_password_hash(user["password_hash"], password):
-            flash("Login inválido.", "error")
-            return render_template("login.html")
-        session["user_id"] = user["id"]
-        flash("Bem-vindo(a)!", "success")
-        next_url = request.args.get("next") or url_for("dashboard")
+        if not user or not check_password_hash(user["password_hash"], request.form.get("password", "")):
+            flash("E-mail ou senha incorretos.", "error")
+            return render_template("login.html"), 401
+        session.clear()
+        session['user_id'] = user['id']
+        candidate = request.args.get('next', '')
+        parsed = urllib.parse.urlsplit(candidate)
+        next_url = candidate if candidate.startswith('/') and not candidate.startswith('//') and not parsed.netloc and not parsed.scheme and '\\' not in candidate else url_for('dashboard')
         return redirect(next_url)
     return render_template("login.html")
 
@@ -502,72 +529,25 @@ def resellers():
 @app.route("/clients")
 @login_required
 def clients_list():
-    q = request.args.get("q", "").strip()
+    q = request.args.get('q', '').strip()
     con = connect()
-    cur = con.cursor()
-    where_parts = []
-    params = []
-    if g.user["role"] == "revenda":
-        where_parts.append("c.reseller_id = ?")
-        params.append(g.user["reseller_id"])
+    clauses, params = [], []
+    if scope_id() is not None:
+        clauses.append('c.reseller_id=?'); params.append(scope_id())
     if q:
-        like = f"%{q}%"
-        where_parts.append("(c.name LIKE ? OR c.cpf LIKE ? OR c.phone LIKE ?)")
-        params.extend([like, like, like])
-    where_sql = ""
-    if where_parts:
-        where_sql = "WHERE " + " AND ".join(where_parts)
-    cur.execute(f"""
-        SELECT c.*, r.razao_social as reseller_name
-        FROM clients c
-        JOIN resellers r ON r.id = c.reseller_id
-        {where_sql}
-        ORDER BY c.created_at DESC
-    """, params)
-    rows = cur.fetchall()
+        clauses.append('(fold(c.name) LIKE ? OR fold(c.cpf) LIKE ? OR fold(c.phone) LIKE ? OR fold(c.delivery_address) LIKE ?)')
+        params.extend(['%' + search_text(q) + '%']*4)
+    where = ' WHERE ' + ' AND '.join(clauses) if clauses else ''
+    rows = con.execute('SELECT c.*,r.razao_social reseller_name,\n        (SELECT COUNT(*) FROM machines m WHERE m.client_id=c.id AND m.archived_at IS NULL) machine_count\n        FROM clients c LEFT JOIN resellers r ON r.id=c.reseller_id' + where + ' ORDER BY fold(c.name),c.id', params).fetchall()
     con.close()
-    return render_template("clients_list.html", rows=rows, q=q)
+    return render_template('clients_list.html', rows=rows, q=q)
 
 
 
 @app.route("/clients/new", methods=["GET", "POST"])
 @login_required
 def client_new():
-    con = connect()
-    cur = con.cursor()
-
-    if request.method == "POST":
-        name = request.form.get("name","").strip()
-        cpf = request.form.get("cpf","").strip()
-        rg = request.form.get("rg","").strip()
-        phone = request.form.get("phone","").strip()
-        billing_address = request.form.get("billing_address","").strip()
-        delivery_address = request.form.get("delivery_address","").strip()
-        delivery_location_url = request.form.get("delivery_location_url","").strip()
-
-        if not name:
-            flash("Nome do cliente é obrigatório.", "error")
-        else:
-            if g.user["role"] == "admin":
-                reseller_id = request.form.get("reseller_id")
-            else:
-                reseller_id = g.user["reseller_id"]
-            cur.execute("""
-                INSERT INTO clients(reseller_id, name, cpf, rg, phone, billing_address, delivery_address, delivery_location_url)
-                VALUES (?,?,?,?,?,?,?,?)
-            """, (reseller_id, name, cpf, rg, phone, billing_address, delivery_address, delivery_location_url))
-            con.commit()
-            flash("Cliente cadastrado com sucesso.", "success")
-            con.close()
-            return redirect(url_for("clients_list"))
-
-    # GET
-    resellers = []
-    if g.user["role"] == "admin":
-        cur.execute("SELECT id, razao_social, fantasy_name FROM resellers ORDER BY razao_social")
-        resellers = cur.fetchall()
-    con.close()
-    return render_template("client_form.html", resellers=resellers)
+    return save_client()
 
 
 
@@ -575,97 +555,34 @@ def client_new():
 @app.route("/clients/<int:client_id>/edit", methods=["GET", "POST"])
 @login_required
 def client_edit(client_id):
-    con = connect()
-    cur = con.cursor()
-
-    # Busca o cliente
-    cur.execute("SELECT * FROM clients WHERE id = ?", (client_id,))
-    client = cur.fetchone()
-    if not client:
-        con.close()
-        flash("Cliente não encontrado.", "error")
-        return redirect(url_for("clients_list"))
-
-    # Permissão: revenda só pode editar seus próprios clientes
-    if g.user["role"] == "revenda" and client["reseller_id"] != g.user["reseller_id"]:
-        con.close()
-        flash("Você não tem permissão para editar este cliente.", "error")
-        return redirect(url_for("clients_list"))
-
-    if request.method == "POST":
-        name = request.form.get("name", "").strip()
-        cpf = request.form.get("cpf", "").strip()
-        rg = request.form.get("rg", "").strip()
-        phone = request.form.get("phone", "").strip()
-        billing_address = request.form.get("billing_address", "").strip()
-        delivery_address = request.form.get("delivery_address", "").strip()
-        delivery_location_url = request.form.get("delivery_location_url", "").strip()
-
-        if not name:
-            flash("Nome do cliente é obrigatório.", "error")
-        else:
-            if g.user["role"] == "admin":
-                reseller_id = request.form.get("reseller_id")
-            else:
-                reseller_id = client["reseller_id"]
-
-            cur.execute(
-                """
-                UPDATE clients
-                   SET reseller_id = ?,
-                       name = ?,
-                       cpf = ?,
-                       rg = ?,
-                       phone = ?,
-                       billing_address = ?,
-                       delivery_address = ?,
-                       delivery_location_url = ?
-                 WHERE id = ?
-                """,
-                (reseller_id, name, cpf, rg, phone, billing_address, delivery_address, delivery_location_url, client_id),
-            )
-            con.commit()
-            flash("Cliente atualizado com sucesso.", "success")
-            con.close()
-            return redirect(url_for("client_panel", client_id=client_id))
-
-    # GET ou POST com erro de validação: carrega lista de revendas (se admin) e volta para o formulário
-    resellers = []
-    if g.user["role"] == "admin":
-        cur.execute("SELECT id, razao_social, fantasy_name FROM resellers ORDER BY razao_social")
-        resellers = cur.fetchall()
-
-    con.close()
-    return render_template("client_form.html", client=client, resellers=resellers)
+    return save_client(client_id)
 
 
 @app.route("/clients/<int:client_id>/delete", methods=["POST"])
 @login_required
 def client_delete(client_id):
-    """Exclui o cliente e todos os registros vinculados (máquinas, OS).
-    Respeita permissão da revenda: só pode excluir clientes da própria revenda.
-    """
     con = connect()
-    cur = con.cursor()
-
-    cur.execute("SELECT id, name, reseller_id FROM clients WHERE id = ?", (client_id,))
-    client = cur.fetchone()
+    client = con.execute('SELECT * FROM clients WHERE id=?', (client_id,)).fetchone()
     if not client:
-        con.close()
-        flash("Cliente não encontrado.", "error")
-        return redirect(url_for("clients_list"))
-
-    # Revenda só pode excluir clientes seus
-    if g.user["role"] == "revenda" and client["reseller_id"] != g.user["reseller_id"]:
-        con.close()
-        flash("Você não tem permissão para excluir este cliente.", "error")
-        return redirect(url_for("clients_list"))
-
-    cur.execute("DELETE FROM clients WHERE id = ?", (client_id,))
-    con.commit()
-    con.close()
-    flash(f"Cliente '{client['name']}' e registros vinculados foram excluídos.", "success")
-    return redirect(url_for("clients_list"))
+        con.close(); abort(404)
+    if not permitted(client):
+        con.close(); abort(403)
+    snapshot(DB_PATH, Path(DATA_DIR)/'backups', 'antes-excluir-cliente')
+    # Bancos antigos podem não declarar CASCADE. Remove dependências explicitamente.
+    mids = [r[0] for r in con.execute('SELECT id FROM machines WHERE client_id=?', (client_id,))]
+    oids = [r[0] for r in con.execute('SELECT id FROM service_orders WHERE client_id=?', (client_id,))]
+    for mid in mids:
+        con.execute('UPDATE service_orders SET machine_id=NULL WHERE machine_id=? AND client_id!=?', (mid,client_id))
+        con.execute('DELETE FROM machine_photos WHERE machine_id=?', (mid,))
+    for oid in oids:
+        con.execute('DELETE FROM service_items WHERE order_id=?', (oid,))
+    con.execute('DELETE FROM service_orders WHERE client_id=?', (client_id,))
+    con.execute('DELETE FROM machines WHERE client_id=?', (client_id,))
+    con.execute('DELETE FROM clients WHERE id=?', (client_id,))
+    record_event(con, 'excluir_cliente', client_id, {'name':client['name'], 'machines':mids, 'orders':oids})
+    con.commit(); con.close()
+    flash('Cliente e vínculos excluídos. Uma cópia anterior foi guardada; os arquivos foram preservados.', 'success')
+    return redirect(url_for('clients_list'))
 
 
 
@@ -676,351 +593,123 @@ def client_delete(client_id):
 @login_required
 def machines_list():
     con = connect()
-    cur = con.cursor()
-    where = ""
-    params = []
-    if g.user["role"] == "revenda":
-        where = "WHERE m.reseller_id = ?"
-        params.append(g.user["reseller_id"])
-
-    cur.execute(f"""
-        SELECT m.*, c.name as client_name, c.delivery_location_url as delivery_location_url,
-               r.razao_social as reseller_name
-        FROM machines m
-        JOIN clients c ON c.id = m.client_id
-        JOIN resellers r ON r.id = m.reseller_id
-        {where}
-        ORDER BY m.created_at DESC
-    """, params)
-    rows = cur.fetchall()
+    rows, duplicates = machine_rows(con, scope_id())
     con.close()
-    return render_template("machines_list.html", rows=rows)
+    q = request.args.get('q', '').strip()
+    status = request.args.get('status', 'active')
+    counts = {'active':sum(not r['archived_at'] for r in rows),
+              'review':sum(bool(r['issues']) and not r['archived_at'] for r in rows),
+              'archived':sum(bool(r['archived_at']) for r in rows),
+              'orphan':sum(r['owner_missing'] and not r['archived_at'] for r in rows)}
+    if status == 'archived': rows = [r for r in rows if r['archived_at']]
+    else:
+        rows = [r for r in rows if not r['archived_at']]
+        if status == 'review': rows = [r for r in rows if r['issues']]
+        elif status == 'orphan': rows = [r for r in rows if r['owner_missing']]
+    if q:
+        query = search_text(q)
+        rows = [r for r in rows if query in search_text(' '.join(str(r.get(k) or '') for k in ('id','name','brand','model','client_name','serial_number','engine_number','nf_number','reseller_name')))]
+    return render_template('machines_list.html', rows=rows, q=q, status=status, counts=counts)
 
 
 @app.route("/machines/new", methods=["GET", "POST"])
 @login_required
 def machine_new():
-    con = connect()
-    cur = con.cursor()
-
-    # clients list filtered by role
-    if g.user["role"] == "admin":
-        cur.execute("""
-            SELECT c.id, c.name, r.razao_social as reseller_name
-            FROM clients c
-            JOIN resellers r ON r.id = c.reseller_id
-            ORDER BY r.razao_social, c.name
-        """)
-    else:
-        cur.execute("""
-            SELECT c.id, c.name, r.razao_social as reseller_name
-            FROM clients c
-            JOIN resellers r ON r.id = c.reseller_id
-            WHERE c.reseller_id = ?
-            ORDER BY c.name
-        """, (g.user["reseller_id"],))
-    clients = cur.fetchall()
-
-    if request.method == "POST":
-        client_id = request.form.get("client_id")
-        name = request.form.get("name","").strip()
-        brand = request.form.get("brand","").strip()
-        model = request.form.get("model","").strip()
-        motor_model = request.form.get("motor_model","").strip()
-        nf_number = request.form.get("nf_number","").strip()
-        serial_number = request.form.get("serial_number","").strip()
-        engine_number = request.form.get("engine_number","").strip()
-        delivery_date = request.form.get("delivery_date","").strip()
-        initial_hours = request.form.get("initial_hours","").strip() or None
-
-        if not client_id or not name:
-            flash("Cliente e nome da máquina são obrigatórios.", "error")
-        else:
-            if g.user["role"] == "admin":
-                # admin escolhe revenda do cliente
-                cur.execute("SELECT reseller_id FROM clients WHERE id = ?", (client_id,))
-                row = cur.fetchone()
-                reseller_id = row["reseller_id"] if row else None
-            else:
-                reseller_id = g.user["reseller_id"]
-
-            cur.execute("""
-                INSERT INTO machines(reseller_id, client_id, name, brand, model, motor_model,
-                                     nf_number, serial_number, engine_number, delivery_date, initial_hours)
-                VALUES (?,?,?,?,?,?,?,?,?,?,?)
-            """, (reseller_id, client_id, name, brand, model, motor_model,
-                  nf_number, serial_number, engine_number, delivery_date, initial_hours))
-            con.commit()
-            flash("Máquina cadastrada com sucesso.", "success")
-            con.close()
-            return redirect(url_for("machines_list"))
-
-    pref_client_id = request.args.get("client_id")
-    con.close()
-    return render_template("machine_form.html", clients=clients, pref_client_id=pref_client_id)
+    return save_machine()
 
 
 
 @app.route("/machines/<int:machine_id>/edit", methods=["GET", "POST"])
 @login_required
 def machine_edit(machine_id):
-    con = connect()
-    cur = con.cursor()
-
-    # Busca a máquina
-    cur.execute("SELECT * FROM machines WHERE id = ?", (machine_id,))
-    machine = cur.fetchone()
-    if not machine:
-        con.close()
-        flash("Máquina não encontrada.", "error")
-        return redirect(url_for("machines_list"))
-
-    # Permissão: revenda só pode editar máquinas da própria revenda
-    if g.user["role"] == "revenda" and machine["reseller_id"] != g.user["reseller_id"]:
-        con.close()
-        flash("Você não tem permissão para editar esta máquina.", "error")
-        return redirect(url_for("machines_list"))
-
-    # Lista de clientes, filtrada por papel
-    if g.user["role"] == "admin":
-        cur.execute(
-            """
-            SELECT c.id, c.name, r.razao_social as reseller_name
-              FROM clients c
-              JOIN resellers r ON r.id = c.reseller_id
-             ORDER BY r.razao_social, c.name
-            """
-        )
-    else:
-        cur.execute(
-            """
-            SELECT c.id, c.name, r.razao_social as reseller_name
-              FROM clients c
-              JOIN resellers r ON r.id = c.reseller_id
-             WHERE c.reseller_id = ?
-             ORDER BY c.name
-            """,
-            (g.user["reseller_id"],),
-        )
-    clients = cur.fetchall()
-
-    if request.method == "POST":
-        client_id = request.form.get("client_id")
-        name = request.form.get("name", "").strip()
-        brand = request.form.get("brand", "").strip()
-        model = request.form.get("model", "").strip()
-        motor_model = request.form.get("motor_model", "").strip()
-        nf_number = request.form.get("nf_number", "").strip()
-        serial_number = request.form.get("serial_number", "").strip()
-        engine_number = request.form.get("engine_number", "").strip()
-        delivery_date = request.form.get("delivery_date", "").strip()
-        initial_hours = request.form.get("initial_hours", "").strip() or None
-
-        if not client_id or not name:
-            flash("Cliente e nome da máquina são obrigatórios.", "error")
-        else:
-            # Define revenda a partir do cliente (admin) ou do usuário logado (revenda)
-            if g.user["role"] == "admin":
-                cur.execute("SELECT reseller_id FROM clients WHERE id = ?", (client_id,))
-                row = cur.fetchone()
-                reseller_id = row["reseller_id"] if row else machine["reseller_id"]
-            else:
-                reseller_id = g.user["reseller_id"]
-
-            cur.execute(
-                """
-                UPDATE machines
-                   SET reseller_id = ?,
-                       client_id = ?,
-                       name = ?,
-                       brand = ?,
-                       model = ?,
-                       motor_model = ?,
-                       nf_number = ?,
-                       serial_number = ?,
-                       engine_number = ?,
-                       delivery_date = ?,
-                       initial_hours = ?
-                 WHERE id = ?
-                """,
-                (
-                    reseller_id,
-                    client_id,
-                    name,
-                    brand,
-                    model,
-                    motor_model,
-                    nf_number,
-                    serial_number,
-                    engine_number,
-                    delivery_date,
-                    initial_hours,
-                    machine_id,
-                ),
-            )
-            con.commit()
-            flash("Máquina atualizada com sucesso.", "success")
-            con.close()
-            return redirect(url_for("machine_detail", machine_id=machine_id))
-
-    # GET ou POST com erro de validação
-    pref_client_id = machine["client_id"]
-    con.close()
-    return render_template("machine_form.html", clients=clients, pref_client_id=pref_client_id, machine=machine)
+    return save_machine(machine_id)
 
 
 @app.route("/machines/<int:machine_id>", methods=["GET", "POST"])
 @login_required
 def machine_detail(machine_id):
     con = connect()
-    cur = con.cursor()
-
-    cur.execute("""
-        SELECT m.*,
-               m.obs as obs_text,
-               c.name as client_name, c.cpf, c.billing_address, c.delivery_address,
-               c.delivery_location_url as delivery_location_url,
-               r.razao_social as reseller_name, r.cnpj
-        FROM machines m
-        JOIN clients c ON c.id = m.client_id
-        JOIN resellers r ON r.id = m.reseller_id
-        WHERE m.id = ?
-    """, (machine_id,))
-    m = cur.fetchone()
-    if m:
+    m = get_machine(con, machine_id)
+    if request.method == 'POST':
+        files = [f for f in request.files.getlist('photos') if f and f.filename]
+        prepared = []
         try:
-            row = dict(m)
-            print(f"[DEBUG] GET machine_detail {machine_id}: obs={row.get('obs')!r}, obs_text={row.get('obs_text')!r}")
-        except Exception as e:
-            print("[DEBUG] Erro ao inspecionar OBS na tela da máquina:", e)
-    if not m:
+            if len(files) > 10:
+                raise ValueError('Selecione até 10 arquivos por envio.')
+            for f in files:
+                ext = Path(f.filename).suffix.lower()
+                header = f.stream.read(32); f.stream.seek(0)
+                valid = ((ext=='.pdf' and header.startswith(b'%PDF-')) or
+                    (ext in ('.jpg','.jpeg') and header.startswith(b'\xff\xd8\xff')) or
+                    (ext=='.png' and header.startswith(b'\x89PNG\r\n\x1a\n')) or
+                    (ext=='.gif' and header.startswith((b'GIF87a',b'GIF89a'))) or
+                    (ext=='.webp' and header[:4]==b'RIFF' and header[8:12]==b'WEBP') or
+                    (ext in ('.heic','.heif') and header[4:8]==b'ftyp'))
+                if not valid:
+                    raise ValueError('Formato inválido. Envie PDF ou imagem JPG, PNG, GIF, WebP ou HEIC.')
+                from werkzeug.utils import secure_filename
+                name = secure_filename(f.filename) or ('anexo' + ext)
+                relative = f'machine_{machine_id}/{uuid.uuid4().hex}_{name}'
+                full = Path(UPLOAD_DIR)/relative
+                full.parent.mkdir(parents=True, exist_ok=True)
+                prepared.append((f, relative, full))
+            written = []
+            try:
+                for f, relative, full in prepared:
+                    written.append(full)
+                    f.save(full)
+                    con.execute('INSERT INTO machine_photos(machine_id,filename) VALUES (?,?)', (machine_id,relative))
+                con.execute('UPDATE machines SET obs=? WHERE id=?', (request.form.get('obs_text',''),machine_id))
+                con.commit()
+            except Exception:
+                con.rollback()
+                for path in written: path.unlink(missing_ok=True)
+                raise
+        except ValueError as error:
+            con.close()
+            flash(str(error), 'error')
+            return redirect(url_for('machine_detail',machine_id=machine_id))
         con.close()
-        flash("Máquina não encontrada.", "error")
-        return redirect(url_for("machines_list"))
-
-    # Permissão da revenda
-    if g.user["role"] == "revenda" and m["reseller_id"] != g.user["reseller_id"]:
-        con.close()
-        flash("Acesso não permitido para esta máquina.", "error")
-        return redirect(url_for("machines_list"))
-
-    if request.method == "POST":
-        obs_text = request.form.get("obs_text","")
-        print(f"[DEBUG] Salvando OBS da máquina {machine_id}: {obs_text!r}")
-        cur.execute("UPDATE machines SET obs = ? WHERE id = ?", (obs_text, machine_id))
-
-        files = request.files.getlist("photos")
-        for f in files:
-            if not f or not f.filename:
-                continue
-            folder = os.path.join(UPLOAD_DIR, f"machine_{machine_id}")
-            os.makedirs(folder, exist_ok=True)
-            safe_name = f.filename.replace(" ", "_")
-            fname = f"{datetime.datetime.now().strftime('%Y%m%d%H%M%S')}_{safe_name}"
-            full_path = os.path.join(folder, fname)
-            f.save(full_path)
-            cur.execute("INSERT INTO machine_photos(machine_id, filename) VALUES (?,?)",
-                        (machine_id, f"machine_{machine_id}/{fname}"))
-
-        con.commit()
-        # Rele a OBS direto do banco para confirmar
-        try:
-            cur.execute("SELECT obs FROM machines WHERE id = ?", (machine_id,))
-            row = cur.fetchone()
-            if row:
-                print(f"[DEBUG] OBS no banco agora: {row['obs']!r}")
-            else:
-                print("[DEBUG] Máquina não encontrada ao reler OBS.")
-        except Exception as e:
-            print("[DEBUG] Erro ao reler OBS:", e)
-        con.close()
-
-        flash("OBS e anexos salvos com sucesso.", "success")
-        return redirect(url_for("machine_detail", machine_id=machine_id))
-
-    cur.execute("SELECT * FROM machine_photos WHERE machine_id = ? ORDER BY id DESC", (machine_id,))
-    photos = cur.fetchall()
+        flash('Observações e anexos salvos.', 'success')
+        return redirect(url_for('machine_detail',machine_id=machine_id))
+    photos = []
+    for row in con.execute('SELECT * FROM machine_photos WHERE machine_id=? ORDER BY id DESC', (machine_id,)):
+        photo = dict(row)
+        photo['missing'] = attachment_path(UPLOAD_DIR,photo['filename']) is None
+        photo['is_image'] = Path(photo['filename']).suffix.lower() in ('.jpg','.jpeg','.png','.gif','.webp')
+        photo['display_name'] = re.sub(r'^(?:[0-9a-f]{32}|[0-9]{14})_', '', Path(photo['filename']).name)
+        photos.append(photo)
+    rows, _ = machine_rows(con,scope_id())
+    quality = next(r for r in rows if r['id']==machine_id)
+    candidates = [r for r in rows if r['id'] in quality['duplicate_ids']]
     con.close()
-    return render_template("machine_detail.html", m=m, photos=photos)
+    return render_template('machine_detail.html',m=m,photos=photos,quality=quality,candidates=candidates)
 
 
 
 
 @app.route("/machines/<int:machine_id>/photos/<int:photo_id>/delete", methods=["POST"])
 @login_required
-def machine_photo_delete(machine_id, photo_id):
+def machine_photo_delete(machine_id,photo_id):
     con = connect()
-    cur = con.cursor()
-
-    # Carrega a máquina para validar permissão
-    cur.execute("SELECT * FROM machines WHERE id = ?", (machine_id,))
-    m = cur.fetchone()
-    if not m:
-        con.close()
-        flash("Máquina não encontrada.", "error")
-        return redirect(url_for("machines_list"))
-
-    # Permissão da revenda
-    if g.user["role"] == "revenda" and m["reseller_id"] != g.user["reseller_id"]:
-        con.close()
-        flash("Acesso não permitido.", "error")
-        return redirect(url_for("machines_list"))
-
-    cur.execute("SELECT * FROM machine_photos WHERE id = ? AND machine_id = ?", (photo_id, machine_id))
-    photo = cur.fetchone()
+    get_machine(con,machine_id)
+    photo=con.execute('SELECT * FROM machine_photos WHERE id=? AND machine_id=?',(photo_id,machine_id)).fetchone()
     if not photo:
-        con.close()
-        flash("Imagem não encontrada.", "error")
-        return redirect(url_for("machine_detail", machine_id=machine_id))
-
-    # Apaga arquivo do disco (se existir)
-    try:
-        rel = photo["filename"]
-        abs_path = os.path.abspath(os.path.join(UPLOAD_DIR, rel))
-        base = os.path.abspath(UPLOAD_DIR)
-        if abs_path.startswith(base) and os.path.exists(abs_path):
-            os.remove(abs_path)
-    except Exception as e:
-        print("[DEBUG] Erro ao excluir arquivo de imagem:", e)
-
-    # Apaga do banco
-    cur.execute("DELETE FROM machine_photos WHERE id = ?", (photo_id,))
-    con.commit()
-    con.close()
-
-    flash("Imagem excluída com sucesso.", "success")
-    return redirect(url_for("machine_detail", machine_id=machine_id))
+        con.close(); abort(404)
+    snapshot(DB_PATH,Path(DATA_DIR)/'backups','antes-remover-anexo')
+    con.execute('DELETE FROM machine_photos WHERE id=?',(photo_id,))
+    record_event(con,'remover_anexo',photo_id,{'filename':photo['filename'],'machine_id':machine_id})
+    con.commit(); con.close()
+    # Mantém o arquivo no backup e no disco para uma eventual restauração.
+    flash('Anexo removido da ficha. O arquivo original foi preservado para recuperação.', 'success')
+    return redirect(url_for('machine_detail',machine_id=machine_id))
 @app.route("/machines/<int:machine_id>/print")
 @login_required
 def machine_print(machine_id):
-    con = connect()
-    cur = con.cursor()
-    cur.execute("""
-        SELECT m.*,
-               m.obs as obs_text,
-               c.name as client_name, c.cpf, c.billing_address, c.delivery_address,
-               r.razao_social as reseller_name, r.cnpj, r.phone as reseller_phone
-        FROM machines m
-        JOIN clients c ON c.id = m.client_id
-        JOIN resellers r ON r.id = m.reseller_id
-        WHERE m.id = ?
-    """, (machine_id,))
-    m = cur.fetchone()
-    if m:
-        try:
-            row = dict(m)
-            print(f"[DEBUG] GET machine_print {machine_id}: obs={row.get('obs')!r}, obs_text={row.get('obs_text')!r}")
-        except Exception as e:
-            print("[DEBUG] Erro ao inspecionar OBS na impressão da máquina:", e)
+    con=connect()
+    m=get_machine(con,machine_id)
     con.close()
-    if not m:
-        flash("Máquina não encontrada.", "error")
-        return redirect(url_for("machines_list"))
-    # Permissão
-    if g.user["role"] == "revenda" and m["reseller_id"] != g.user["reseller_id"]:
-        flash("Acesso não permitido para esta máquina.", "error")
-        return redirect(url_for("machines_list"))
-    return render_template("machine_print.html", m=m)
+    return render_template('machine_print.html',m=m)
 
 
 # ---------- Painel do cliente e Ordens de Serviço ----------
@@ -1061,9 +750,9 @@ def client_panel(client_id):
     cur.execute("""
         SELECT m.*
         FROM machines m
-        WHERE m.client_id = ?
-        ORDER BY m.created_at DESC
-    """, (client_id,))
+        WHERE m.client_id = ? AND m.reseller_id = ? AND m.archived_at IS NULL
+        ORDER BY m.id DESC
+    """, (client_id, client["reseller_id"]))
     machines = cur.fetchall()
 
     # Últimas OS deste cliente
@@ -1071,10 +760,10 @@ def client_panel(client_id):
         SELECT o.*, m.name AS machine_name
         FROM service_orders o
         LEFT JOIN machines m ON m.id = o.machine_id
-        WHERE o.client_id = ?
-        ORDER BY o.created_at DESC
+        WHERE o.client_id = ? AND o.reseller_id = ?
+        ORDER BY o.id DESC
         LIMIT 50
-    """, (client_id,))
+    """, (client_id, client["reseller_id"]))
     orders = cur.fetchall()
 
     con.close()
@@ -1084,169 +773,55 @@ def client_panel(client_id):
 @app.route("/clients/<int:client_id>/os/nova", methods=["POST"])
 @login_required
 def client_os_new(client_id):
-    """Cria uma nova OS vinculada ao cliente (e opcionalmente a uma máquina)."""
-    con = connect()
-    cur = con.cursor()
-
-    # Garante que o cliente existe e respeita permissão da revenda
-    cur.execute("SELECT * FROM clients WHERE id = ?", (client_id,))
-    client = cur.fetchone()
+    con=connect()
+    client=con.execute('SELECT * FROM clients WHERE id=?',(client_id,)).fetchone()
     if not client:
-        con.close()
-        flash("Cliente não encontrado.", "error")
-        return redirect(url_for("clients_list"))
-
-    if g.user["role"] == "revenda" and client["reseller_id"] != g.user["reseller_id"]:
-        con.close()
-        flash("Acesso não permitido para este cliente.", "error")
-        return redirect(url_for("clients_list"))
-
-    service_date = request.form.get("service_date", "").strip()
-    address = request.form.get("address", "").strip()
-    maps_url = request.form.get("maps_url", "").strip()
-    obs = request.form.get("obs", "").strip()
-    machine_id = request.form.get("machine_id", "").strip() or None
-
-    # reseller da OS
-    if g.user["role"] == "admin":
-        reseller_id = client["reseller_id"]
-    else:
-        reseller_id = g.user["reseller_id"]
-
-    cur.execute("""
-        INSERT INTO service_orders(reseller_id, client_id, machine_id, service_date, address, maps_url, obs)
-        VALUES (?,?,?,?,?,?,?)
-    """, (reseller_id, client_id, machine_id, service_date, address, maps_url, obs))
-    order_id = cur.lastrowid
-
-    # Itens da OS (campo aberto, um por linha)
-    items = request.form.getlist("items[]")
-    for txt in items:
-        t = (txt or "").strip()
-        if not t:
-            continue
-        cur.execute("INSERT INTO service_items(order_id, item_text) VALUES (?,?)", (order_id, t))
-
-    con.commit()
-    con.close()
-    flash("OS criada com sucesso.", "success")
-    return redirect(url_for("service_order_detail", order_id=order_id))
+        con.close(); abort(404)
+    if not permitted(client):
+        con.close(); abort(403)
+    machine_id=request.form.get('machine_id','').strip() or None
+    if machine_id:
+        machine=con.execute('SELECT * FROM machines WHERE id=?',(machine_id,)).fetchone()
+        if not machine or machine['client_id']!=client_id or machine['reseller_id']!=client['reseller_id'] or machine['archived_at']:
+            con.close()
+            flash('A máquina selecionada não pertence a este cliente ou está arquivada.', 'error')
+            return redirect(url_for('client_panel',client_id=client_id))
+    service_date=request.form.get('service_date','').strip()
+    if service_date:
+        try: datetime.date.fromisoformat(service_date)
+        except ValueError:
+            con.close(); flash('Informe uma data de serviço válida.', 'error')
+            return redirect(url_for('client_panel',client_id=client_id))
+    values=[request.form.get(k,'').strip() for k in ('address','maps_url','obs')]
+    order_id=con.execute('INSERT INTO service_orders(reseller_id,client_id,machine_id,service_date,address,maps_url,obs) VALUES (?,?,?,?,?,?,?)',
+        (client['reseller_id'],client_id,machine_id,service_date,*values)).lastrowid
+    items=request.form.getlist('items[]')
+    # Inclui também o último item digitado mesmo sem clicar em Adicionar.
+    items.append(request.form.get('pending_item',''))
+    for text in items:
+        if text.strip(): con.execute('INSERT INTO service_items(order_id,item_text) VALUES (?,?)',(order_id,text.strip()))
+    con.commit(); con.close()
+    flash('Ordem de serviço criada.', 'success')
+    return redirect(url_for('service_order_detail',order_id=order_id))
 
 
 @app.route("/os/<int:order_id>")
 @login_required
 def service_order_detail(order_id):
-    """Detalhe da OS, com botão para imprimir e enviar localização pelo WhatsApp."""
-    con = connect()
-    cur = con.cursor()
-    cur.execute("""
-        SELECT o.*, 
-               c.name AS client_name, c.cpf, c.billing_address, c.delivery_address, c.delivery_location_url,
-               m.name AS machine_name,
-               r.razao_social AS reseller_name, r.cnpj, r.phone AS reseller_phone
-        FROM service_orders o
-        JOIN clients c ON c.id = o.client_id
-        JOIN resellers r ON r.id = o.reseller_id
-        LEFT JOIN machines m ON m.id = o.machine_id
-        WHERE o.id = ?
-    """, (order_id,))
-    o = cur.fetchone()
-    if not o:
-        con.close()
-        flash("OS não encontrada.", "error")
-        return redirect(url_for("clients_list"))
-
-    if g.user["role"] == "revenda" and o["reseller_id"] != g.user["reseller_id"]:
-        con.close()
-        flash("Acesso não permitido para esta OS.", "error")
-        return redirect(url_for("clients_list"))
-
-    cur.execute("SELECT * FROM service_items WHERE order_id = ? ORDER BY id", (order_id,))
-    items = cur.fetchall()
-    con.close()
-    return render_template("service_order_detail.html", o=o, items=items)
+    return show_order(order_id,'service_order_detail.html')
 
 
 @app.route("/os/<int:order_id>/print")
 @login_required
 def service_order_print(order_id):
-    """Versão de impressão da OS, com logo da Solutec."""
-    con = connect()
-    cur = con.cursor()
-    cur.execute("""
-        SELECT o.*, 
-               c.name AS client_name, c.cpf, c.billing_address, c.delivery_address, c.delivery_location_url,
-               m.name AS machine_name, m.brand, m.model, m.motor_model,
-               m.nf_number, m.serial_number, m.engine_number,
-               r.razao_social AS reseller_name, r.cnpj, r.phone AS reseller_phone
-        FROM service_orders o
-        JOIN clients c ON c.id = o.client_id
-        JOIN resellers r ON r.id = o.reseller_id
-        LEFT JOIN machines m ON m.id = o.machine_id
-        WHERE o.id = ?
-    """, (order_id,))
-    o = cur.fetchone()
-    if not o:
-        con.close()
-        flash("OS não encontrada.", "error")
-        return redirect(url_for("clients_list"))
-
-    if g.user["role"] == "revenda" and o["reseller_id"] != g.user["reseller_id"]:
-        con.close()
-        flash("Acesso não permitido para esta OS.", "error")
-        return redirect(url_for("clients_list"))
-
-    cur.execute("SELECT * FROM service_items WHERE order_id = ? ORDER BY id", (order_id,))
-    items = cur.fetchall()
-    con.close()
-    return render_template("service_order_print.html", o=o, items=items)
+    return show_order(order_id,'service_order_print.html')
 
 # ---------- Search ----------
 
 @app.route("/search")
 @login_required
 def search():
-    q = request.args.get("q","").strip()
-    rows = []
-    if not q:
-        return render_template("search.html", q=q, rows=rows)
-
-    like = f"%{q}%"
-    params = [like, like, like, like, like, like, like, like, like, like]
-    extra_where = ""
-    if g.user["role"] == "revenda":
-        extra_where = "AND m.reseller_id = ?"
-        params.append(g.user["reseller_id"])
-
-    con = connect()
-    cur = con.cursor()
-    cur.execute(f"""
-        SELECT m.id, m.name as machine_name, m.serial_number, m.engine_number, m.nf_number,
-               m.delivery_date,
-               c.name as client_name, c.cpf,
-               r.razao_social as reseller_name, r.cnpj as reseller_cnpj, r.address_city as reseller_city
-        FROM machines m
-        JOIN clients c ON c.id = m.client_id
-        JOIN resellers r ON r.id = m.reseller_id
-        WHERE (
-            c.name LIKE ?
-            OR c.cpf LIKE ?
-            OR m.serial_number LIKE ?
-            OR m.engine_number LIKE ?
-            OR m.nf_number LIKE ?
-            OR c.billing_address LIKE ?
-            OR c.delivery_address LIKE ?
-            OR r.razao_social LIKE ?
-            OR r.cnpj LIKE ?
-            OR r.address_city LIKE ?
-        )
-        {extra_where}
-        ORDER BY m.delivery_date DESC
-        LIMIT 50
-    """, params)
-    rows = cur.fetchall()
-    con.close()
-    return render_template("search.html", q=q, rows=rows)
+    return redirect(url_for('machines_list', q=request.args.get('q','').strip()))
 
 
 # ---------- Uploads ----------
@@ -1254,7 +829,316 @@ def search():
 @app.route("/uploads/<path:filename>")
 @login_required
 def uploads(filename):
-    return send_from_directory(UPLOAD_DIR, filename)
+    # A URL do anexo também precisa respeitar o acesso da revenda.
+    path=attachment_path(UPLOAD_DIR,filename)
+    if not path: abort(404)
+    match=re.fullmatch(r'machine_([0-9]+)/[^/]+',filename)
+    if not match: abort(404)
+    con=connect()
+    machine=con.execute('SELECT * FROM machines WHERE id=?',(int(match[1]),)).fetchone()
+    if not machine or not permitted(machine):
+        con.close(); abort(404)
+    registered=any(normalized_path(r['filename'])==normalized_path(filename)
+                   for r in con.execute('SELECT filename FROM machine_photos WHERE machine_id=?',(machine['id'],)))
+    con.close()
+    if not registered: abort(404)
+    return send_file(path,as_attachment=request.args.get('download')=='1')
+
+
+# ---------- Validação, conferência e backup ----------
+def scope_id():
+    return g.user['reseller_id'] if g.user and g.user['role']=='revenda' else None
+
+
+def permitted(row):
+    return bool(g.user) and (g.user['role']=='admin' or row['reseller_id']==g.user['reseller_id'])
+
+
+def normalized_path(value):
+    import unicodedata
+    return unicodedata.normalize('NFC',value)
+
+
+def csrf_token():
+    if '_csrf' not in session:
+        session['_csrf']=secrets.token_urlsafe(32)
+    return session['_csrf']
+
+
+@app.context_processor
+def interface_helpers():
+    return {'csrf_token':csrf_token, 'today':datetime.date.today(), 'app_version':'2.0'}
+
+
+@app.template_filter('brdate')
+def brdate(value):
+    if not value: return 'Não informada'
+    try: return datetime.date.fromisoformat(str(value)[:10]).strftime('%d/%m/%Y')
+    except ValueError: return value
+
+
+@app.before_request
+def protect_forms():
+    if request.method=='POST':
+        expected=session.get('_csrf','')
+        submitted=request.form.get('_csrf','')
+        if not expected or not hmac.compare_digest(expected,submitted):
+            return render_template('error.html',title='Atualize a página',message='O formulário expirou. Volte, atualize a página e tente novamente.'),400
+
+
+@app.after_request
+def response_headers(response):
+    response.headers['X-Content-Type-Options']='nosniff'
+    response.headers['X-Frame-Options']='SAMEORIGIN'
+    response.headers['Referrer-Policy']='strict-origin-when-cross-origin'
+    if request.endpoint not in ('static','health'):
+        response.headers['Cache-Control']='no-store'
+    return response
+
+
+@app.errorhandler(403)
+@app.errorhandler(404)
+@app.errorhandler(413)
+def user_error(error):
+    messages={403:('Acesso não permitido','Este registro pertence a outra revenda.'),
+              404:('Registro não encontrado','O registro ou anexo não está disponível para esta conta.'),
+              413:('Envio muito grande','Envie até 25 MB por vez. Divida os anexos em mais de um envio.')}
+    title,message=messages[error.code]
+    return render_template('error.html',title=title,message=message),error.code
+
+
+def record_event(con,action,record_id,details):
+    con.execute('INSERT INTO maintenance_events(user_id,action,record_id,details) VALUES (?,?,?,?)',
+                (g.user['id'],action,record_id,json.dumps(details,ensure_ascii=False)))
+
+
+def get_machine(con,machine_id):
+    machine=con.execute('''SELECT m.*,m.obs AS obs_text,c.name AS client_name,c.cpf,
+        c.billing_address,c.delivery_address,c.delivery_location_url,c.reseller_id AS owner_reseller_id,
+        r.razao_social AS reseller_name,r.cnpj,r.phone AS reseller_phone
+        FROM machines m LEFT JOIN clients c ON c.id=m.client_id
+        LEFT JOIN resellers r ON r.id=m.reseller_id WHERE m.id=?''',(machine_id,)).fetchone()
+    if not machine:
+        con.close(); abort(404)
+    if not permitted(machine):
+        con.close(); abort(403)
+    data=dict(machine)
+    data['obs_text']=data['obs']
+    if g.user['role']=='revenda' and data['owner_reseller_id']!=g.user['reseller_id']:
+        for field in ('client_name','cpf','billing_address','delivery_address','delivery_location_url'):
+            data[field]=None
+    return data
+
+
+def save_client(client_id=None):
+    con=connect()
+    old=con.execute('SELECT * FROM clients WHERE id=?',(client_id,)).fetchone() if client_id else None
+    if client_id and not old:
+        con.close(); abort(404)
+    if old and not permitted(old):
+        con.close(); abort(403)
+    data=dict(old) if old else {}
+    fields=('name','cpf','rg','phone','billing_address','delivery_address','delivery_location_url')
+    if request.method=='POST':
+        data.update({f:request.form.get(f,'').strip() for f in fields})
+        rid=request.form.get('reseller_id',type=int) if g.user['role']=='admin' else g.user['reseller_id']
+        data['reseller_id']=rid
+        error=None
+        if not data['name']:
+            error='Informe o nome do cliente.'
+        elif not rid or not con.execute('SELECT 1 FROM resellers WHERE id=?',(rid,)).fetchone():
+            error='Selecione uma revenda válida.'
+        elif any(len(str(v or ''))>5000 for v in data.values()):
+            error='Um dos campos está muito longo. Use até 5.000 caracteres.'
+        if not error and data['cpf'] and (not old or normalized(old['cpf'])!=normalized(data['cpf']) or rid!=old['reseller_id']):
+            for other in con.execute('SELECT id,cpf FROM clients WHERE reseller_id=? AND id!=?',(rid,client_id or 0)):
+                if normalized(other['cpf'])==normalized(data['cpf']):
+                    error='Este CPF já está cadastrado nesta revenda. Confira a lista de clientes.'; break
+        if error:
+            flash(error,'error')
+        else:
+            if old:
+                snapshot(DB_PATH,Path(DATA_DIR)/'backups','antes-editar-cliente')
+                con.execute('UPDATE clients SET reseller_id=?,'+','.join(f+'=?' for f in fields)+' WHERE id=?',
+                            (rid,*(data[f] for f in fields),client_id))
+                if rid!=old['reseller_id']:
+                    con.execute('UPDATE machines SET reseller_id=? WHERE client_id=?',(rid,client_id))
+                    con.execute('UPDATE service_orders SET reseller_id=? WHERE client_id=?',(rid,client_id))
+                    record_event(con,'transferir_cliente',client_id,{'from':old['reseller_id'],'to':rid})
+            else:
+                client_id=con.execute('INSERT INTO clients(reseller_id,'+','.join(fields)+') VALUES ('+','.join('?' for _ in range(len(fields)+1))+')',
+                                      (rid,*(data[f] for f in fields))).lastrowid
+            con.commit(); con.close()
+            flash('Cliente salvo com sucesso.','success')
+            return redirect(url_for('client_panel',client_id=client_id))
+    resellers=con.execute('SELECT id,razao_social,fantasy_name FROM resellers ORDER BY razao_social').fetchall() if g.user['role']=='admin' else []
+    if not data and len(resellers)==1: data['reseller_id']=resellers[0]['id']
+    con.close()
+    return render_template('client_form.html',client=data,editing=bool(old),resellers=resellers)
+
+
+def save_machine(machine_id=None):
+    con=connect()
+    old=get_machine(con,machine_id) if machine_id else None
+    data=dict(old) if old else {'client_id':request.args.get('client_id',type=int)}
+    where,params=(' WHERE c.reseller_id=?',[scope_id()]) if scope_id() is not None else ('',[])
+    clients=con.execute('''SELECT c.id,c.name,c.reseller_id,r.razao_social AS reseller_name FROM clients c
+                          JOIN resellers r ON r.id=c.reseller_id'''+where+' ORDER BY fold(c.name)',params).fetchall()
+    fields=('name','brand','model','motor_model','nf_number','serial_number','engine_number','delivery_date','initial_hours')
+    if request.method=='POST':
+        data.update({f:request.form.get(f,'').strip() for f in fields})
+        data['client_id']=request.form.get('client_id',type=int)
+        client=next((c for c in clients if c['id']==data['client_id']),None)
+        error=None
+        if not client or not data['name']:
+            error='Selecione um cliente válido e informe o nome da máquina.'
+        if not error and data['delivery_date']:
+            try: datetime.date.fromisoformat(data['delivery_date'])
+            except ValueError: error='Informe uma data de entrega válida.'
+        if not error and data['initial_hours']:
+            try:
+                data['initial_hours']=float(data['initial_hours'].replace(',','.'))
+                if not math.isfinite(data['initial_hours']) or data['initial_hours']<0: raise ValueError
+            except (ValueError,AttributeError): error='O horímetro deve ser um número maior ou igual a zero.'
+        elif not data['initial_hours']: data['initial_hours']=None
+        if not error:
+            con.execute('BEGIN IMMEDIATE')
+            for field,label in (('serial_number','número de série'),('engine_number','número do motor')):
+                key=normalized(data[field])
+                if not key or (old and normalized(old[field])==key and old['reseller_id']==client['reseller_id']): continue
+                for other in con.execute('SELECT id,'+field+' FROM machines WHERE reseller_id=? AND id!=? AND archived_at IS NULL',
+                                         (client['reseller_id'],machine_id or 0)):
+                    if normalized(other[field])==key:
+                        error=f'Este {label} já está cadastrado na máquina #{other["id"]}. Confira o cadastro existente.'; break
+                if error: break
+            if error: con.rollback()
+        if error:
+            flash(error,'error')
+        else:
+            if old:
+                # A cópia usa uma segunda conexão; nenhuma escrita foi feita ainda.
+                snapshot(DB_PATH,Path(DATA_DIR)/'backups','antes-editar-maquina')
+                con.execute('UPDATE machines SET client_id=?,reseller_id=?,'+','.join(f+'=?' for f in fields)+' WHERE id=?',
+                    (client['id'],client['reseller_id'],*(data[f] for f in fields),machine_id))
+                if old['client_id']!=client['id'] or old['reseller_id']!=client['reseller_id']:
+                    # Mantém cliente e máquina das OS históricas. Divergências continuam
+                    # visíveis na conferência, sem reescrever a propriedade de um atendimento passado.
+                    order_ids=[row[0] for row in con.execute('SELECT id FROM service_orders WHERE machine_id=?',(machine_id,))]
+                    record_event(con,'alterar_proprietario',machine_id,{'from':old['client_id'],'to':client['id'],'preserved_orders':order_ids})
+            else:
+                machine_id=con.execute('INSERT INTO machines(client_id,reseller_id,'+','.join(fields)+') VALUES ('+','.join('?' for _ in range(len(fields)+2))+')',
+                    (client['id'],client['reseller_id'],*(data[f] for f in fields))).lastrowid
+            con.commit(); con.close()
+            flash('Máquina salva com sucesso.','success')
+            return redirect(url_for('machine_detail',machine_id=machine_id))
+    con.close()
+    return render_template('machine_form.html',machine=data,editing=bool(old),clients=clients)
+
+
+def show_order(order_id,template):
+    con=connect()
+    o=con.execute('''SELECT o.*, c.name AS client_name,c.cpf,c.billing_address,c.delivery_address,c.delivery_location_url,c.reseller_id AS owner_reseller_id,
+        m.reseller_id AS machine_reseller_id,m.name AS machine_name,m.brand,m.model,m.motor_model,m.nf_number,m.serial_number,m.engine_number,
+        r.razao_social AS reseller_name,r.cnpj,r.phone AS reseller_phone
+        FROM service_orders o LEFT JOIN clients c ON c.id=o.client_id
+        LEFT JOIN resellers r ON r.id=o.reseller_id LEFT JOIN machines m ON m.id=o.machine_id WHERE o.id=?''',(order_id,)).fetchone()
+    if not o:
+        con.close(); abort(404)
+    if not permitted(o):
+        con.close(); abort(403)
+    items=con.execute('SELECT * FROM service_items WHERE order_id=? ORDER BY id',(order_id,)).fetchall()
+    con.close()
+    data=dict(o)
+    if g.user['role']=='revenda':
+        if data['owner_reseller_id']!=g.user['reseller_id']:
+            for field in ('client_name','cpf','billing_address','delivery_address','delivery_location_url'):
+                data[field]=None
+        if data['machine_reseller_id']!=g.user['reseller_id']:
+            for field in ('machine_name','brand','model','motor_model','nf_number','serial_number','engine_number'):
+                data[field]=None
+    return render_template(template,o=data,items=items)
+
+
+@app.route('/admin/conferencia')
+@admin_required
+def diagnostics():
+    con=connect()
+    report=audit(con,UPLOAD_DIR)
+    clients=con.execute('SELECT id,name FROM clients ORDER BY fold(name)').fetchall()
+    events=con.execute('SELECT * FROM maintenance_events ORDER BY id DESC LIMIT 20').fetchall()
+    con.close()
+    return render_template('diagnostics.html',report=report,clients=clients,events=events)
+
+
+@app.route('/machines/<int:machine_id>/archive',methods=['POST'])
+@admin_required
+def machine_archive(machine_id):
+    con=connect()
+    machine=get_machine(con,machine_id)
+    restore=request.form.get('action')=='restore'
+    reason=request.form.get('reason','').strip()
+    if not restore and (not reason or request.form.get('confirmation')!=str(machine_id)):
+        con.close(); flash('Informe o motivo e confirme o número do cadastro para arquivar.','error')
+        return redirect(url_for('machine_detail',machine_id=machine_id))
+    snapshot(DB_PATH,Path(DATA_DIR)/'backups','antes-arquivar-maquina')
+    stamp=None if restore else datetime.datetime.now(datetime.timezone.utc).isoformat()
+    con.execute('UPDATE machines SET archived_at=?,archive_reason=? WHERE id=?',(stamp,None if restore else reason,machine_id))
+    record_event(con,'restaurar_maquina' if restore else 'arquivar_maquina',machine_id,{'reason':reason})
+    con.commit(); con.close()
+    flash('Máquina restaurada.' if restore else 'Cadastro arquivado. Dados, anexos e OS foram preservados.','success')
+    return redirect(url_for('machine_detail',machine_id=machine_id))
+
+
+@app.route('/admin/os/<int:order_id>/relink',methods=['POST'])
+@admin_required
+def order_relink(order_id):
+    con=connect()
+    order=con.execute('SELECT * FROM service_orders WHERE id=?',(order_id,)).fetchone()
+    client=con.execute('SELECT * FROM clients WHERE id=?',(request.form.get('client_id',type=int),)).fetchone()
+    if not order or not client:
+        con.close(); abort(404)
+    if request.form.get('confirmation')!=str(order_id):
+        con.close(); flash('Confirme o número da OS antes de alterar o vínculo.','error')
+        return redirect(url_for('diagnostics'))
+    machine=con.execute('SELECT * FROM machines WHERE id=?',(order['machine_id'],)).fetchone() if order['machine_id'] else None
+    if machine and (machine['client_id']!=client['id'] or machine['reseller_id']!=client['reseller_id']):
+        con.close(); flash('Primeiro corrija o proprietário da máquina vinculada a esta OS.','error')
+        return redirect(url_for('diagnostics'))
+    snapshot(DB_PATH,Path(DATA_DIR)/'backups','antes-vincular-os')
+    con.execute('UPDATE service_orders SET client_id=?,reseller_id=? WHERE id=?',(client['id'],client['reseller_id'],order_id))
+    record_event(con,'vincular_os',order_id,{'from':order['client_id'],'to':client['id']})
+    con.commit(); con.close()
+    flash('Vínculo da OS atualizado e alteração registrada.','success')
+    return redirect(url_for('diagnostics'))
+
+
+@app.route('/admin/backup',methods=['POST'])
+@admin_required
+def backup_download():
+    from io import BytesIO
+    buffer=BytesIO()
+    with tempfile.TemporaryDirectory(prefix='solutec-backup-') as temp:
+        db=snapshot(DB_PATH,temp,'copia')
+        with zipfile.ZipFile(buffer,'w',zipfile.ZIP_DEFLATED) as archive:
+            archive.write(db,'solutec.db')
+            for path in Path(UPLOAD_DIR).rglob('*'):
+                if path.is_file() and not path.is_symlink():
+                    archive.write(path,'uploads/'+path.relative_to(UPLOAD_DIR).as_posix())
+            archive.writestr('LEIA-ME.txt','Backup Solutec: banco consistente + anexos. Para restaurar, pare o serviço, guarde uma cópia do volume atual e substitua solutec.db e uploads no volume /data. Não restaure sobre o serviço em execução. Preserve SECRET_KEY. Não envie este backup para repositórios públicos.')
+    buffer.seek(0)
+    filename='Solutec_Backup_'+datetime.datetime.now().strftime('%Y%m%d_%H%M%S')+'.zip'
+    return send_file(buffer,mimetype='application/zip',as_attachment=True,download_name=filename)
+
+
+@app.route('/access/qr.svg')
+@login_required
+def access_qr():
+    from io import BytesIO
+    import qrcode
+    from qrcode.image.svg import SvgPathImage
+    buffer=BytesIO()
+    qrcode.make(request.host_url.rstrip('/'),image_factory=SvgPathImage,box_size=6,border=3).save(buffer)
+    return app.response_class(buffer.getvalue(),mimetype='image/svg+xml')
 
 
 # O Gunicorn importa este módulo sem executar o bloco __main__.

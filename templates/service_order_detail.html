@@ -1,16 +1,16 @@
 {% extends "base.html" %}
-{% block title %}OS #{{ o.id }} - {{ o.client_name }} - Solutec{% endblock %}
+{% block title %}OS #{{ o.id }} - {{ o.client_name or "Cliente não encontrado · vínculo pendente" }} - Solutec{% endblock %}
 {% block body %}
 <div class="card">
   <div class="section-header">
     <div>
       <div class="section-title">Ordem de Serviço #{{ o.id }}</div>
       <div class="section-sub">
-        Cliente: <strong>{{ o.client_name }}</strong>
+        Cliente: <strong>{{ o.client_name or "Cliente não encontrado · vínculo pendente" }}</strong>
         {% if o.machine_name %}
           · Máquina: <strong>{{ o.machine_name }}</strong>
         {% endif %}
-        · Data: {{ o.service_date or o.created_at[:10] }}
+        · Data: {{ (o.service_date or o.created_at)|brdate }}
       </div>
     </div>
     <div class="section-actions">
@@ -22,7 +22,7 @@
   <div class="grid2" style="margin-top:14px;">
     <div>
       <h3 class="field-title">Dados do cliente</h3>
-      <p class="field-line"><strong>Nome:</strong> {{ o.client_name }}</p>
+      <p class="field-line"><strong>Nome:</strong> {{ o.client_name or "Cliente não encontrado · vínculo pendente" }}</p>
       <p class="field-line"><strong>CPF:</strong> {{ o.cpf or '-' }}</p>
       <p class="field-line"><strong>Endereço faturamento:</strong> {{ o.billing_address or '-' }}</p>
       <p class="field-line"><strong>Endereço entrega:</strong> {{ o.delivery_address or '-' }}</p>
@@ -64,7 +64,7 @@
           </p>
           {% set wa_text = 'Localização da OS #' ~ o.id ~ ' - ' ~ o.client_name ~ ': ' ~ final_loc %}
           <p class="field-line">
-            <a href="https://wa.me/?text={{ wa_text|urlencode }}" target="_blank" class="btn">
+            <a href="https://wa.me/?text={{ wa_text|urlencode }}" target="_blank" rel="noopener" class="btn">
               📲 Enviar localização no WhatsApp
             </a>
             <span class="muted" style="display:block;margin-top:2px;">

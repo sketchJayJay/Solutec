@@ -1,15 +1,15 @@
 <!doctype html>
 <html lang="pt-br">
 <head>
-  <meta charset="utf-8" />
-  <title>OS #{{ o.id }} - {{ o.client_name }}</title>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OS #{{ o.id }} - {{ o.client_name or "Cliente não encontrado · vínculo pendente" }}</title>
   <style>
     *{ box-sizing:border-box; }
     body{
       font-family: system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
       margin:0;
       padding:18px;
-      background:#020617;
+      background:#edf2f8;
       color:#0f172a;
       font-size:12px;
     }
@@ -26,7 +26,7 @@
       display:flex;
       justify-content:space-between;
       align-items:center;
-      background:linear-gradient(90deg,#0b1220,#1e293b);
+      background:#133558;
       border-radius:12px;
       padding:10px 14px;
       margin-bottom:14px;
@@ -38,7 +38,7 @@
       gap:10px;
     }
     .brand-logo img{
-      height:180px;
+      height:auto; width:110px; max-height:45px; object-fit:contain;
     }
     .brand-title{
       font-weight:700;
@@ -158,6 +158,18 @@
         padding:10mm;
       }
     }
+  @page { size:A4; margin:10mm; }
+    .block { break-inside:avoid; } .col { min-width:0; }
+    .header { gap:16px; } .brand-title { font-size:14px; }
+    .field-line, .obs-box { overflow-wrap:anywhere; }
+    @media screen and (max-width:600px) {
+      body { padding:10px; } .page { padding:14px; }
+      .header,.grid-2 { flex-direction:column; align-items:stretch; }
+      .header { padding:16px; } .brand { align-items:flex-start; }
+      .brand-logo img { width:85px; } .brand-title { font-size:12px; }
+      .machine-id,.os-id { text-align:left; margin-top:10px; }
+    }
+    @media print { .page { padding:0; } .header { print-color-adjust:exact; } }
   </style>
 </head>
 <body onload="window.print()">
@@ -165,7 +177,7 @@
     <div class="header">
       <div class="brand">
         <div class="brand-logo">
-          <img src="{{ url_for('static', filename='logo.png') }}" alt="Solutec">
+          <img src="{{ url_for('static', filename='logo-brand.png') }}" alt="Solutec">
         </div>
         <div>
           <div class="brand-title">Solutec Implementos Agrícolas</div>
@@ -178,7 +190,7 @@
       <div class="os-id">
         <div class="os-id-main">OS #{{ o.id }}</div>
         <div class="os-id-sub">
-          Data do serviço: {{ o.service_date or (o.created_at[:10] if o.created_at) }}
+          Data do serviço: {{ (o.service_date or o.created_at)|brdate }}
         </div>
       </div>
     </div>
@@ -187,7 +199,7 @@
       <div class="col">
         <div class="block">
           <div class="block-title">Dados do cliente</div>
-          <div class="field-line"><strong>Nome:</strong> {{ o.client_name }}</div>
+          <div class="field-line"><strong>Nome:</strong> {{ o.client_name or "Cliente não encontrado · vínculo pendente" }}</div>
           <div class="field-line"><strong>CPF:</strong> {{ o.cpf or '-' }}</div>
           <div class="field-line"><strong>Endereço faturamento:</strong> {{ o.billing_address or '-' }}</div>
           <div class="field-line"><strong>Endereço entrega:</strong> {{ o.delivery_address or '-' }}</div>

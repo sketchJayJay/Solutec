@@ -12,15 +12,12 @@
         {% endif %}
       </div>
     </div>
-    <div style="display:flex;gap:.5rem;align-items:center">
+    <div class="section-actions">
       <a href="{{ url_for('clients_list') }}" class="btn">Voltar</a>
       <a href="{{ url_for('client_edit', client_id=client.id) }}" class="btn primary">Editar cliente</a>
       <form method="post"
             action="{{ url_for('client_delete', client_id=client.id) }}"
-            onsubmit="return confirm('Excluir este cliente e todos os registros vinculados?');">
-        <button type="submit" class="btn btn-danger">🗑 Excluir cliente</button>
-      </form>
-      <form method="post" action="{{ url_for('client_delete', client_id=client.id) }}" onsubmit="return confirm('Excluir este cliente e todos os registros vinculados?');">
+            onsubmit="return confirm('Excluir este cliente e todos os registros vinculados?');"><input type="hidden" name="_csrf" value="{{ csrf_token() }}">
         <button type="submit" class="btn btn-danger">🗑 Excluir cliente</button>
       </form>
     </div>
@@ -48,7 +45,7 @@
       {% if client.delivery_location_url %}
         <p class="field-line">
           <strong>Google Maps:</strong><br>
-          <a href="{{ build_maps_url(client.delivery_location_url) }}" target="_blank" class="btn">📍 Ver no mapa</a>
+          <a href="{{ build_maps_url(client.delivery_location_url) }}" target="_blank" rel="noopener" class="btn">📍 Ver no mapa</a>
           <div class="muted" style="margin-top:2px;">Abre direto no Google Maps.</div>
         </p>
       {% else %}
@@ -114,7 +111,7 @@
   <h3 class="section-title" style="margin-bottom:6px;">Nova OS rápida</h3>
   <div class="section-sub" style="margin-bottom:10px;">Descreva item por item o que foi feito e gere a OS para impressão.</div>
 
-  <form method="post" action="{{ url_for('client_os_new', client_id=client.id) }}" id="os-form">
+  <form method="post" action="{{ url_for('client_os_new', client_id=client.id) }}" id="os-form"><input type="hidden" name="_csrf" value="{{ csrf_token() }}">
     <div class="grid2">
       <div>
         <label>Máquina (opcional)</label>
@@ -134,7 +131,7 @@
     <div style="margin-top:10px;">
       <label class="field-title">Itens executados</label>
       <div class="os-item-line">
-        <input type="text" id="os-item-input" placeholder="Descreva um item (ex: Troca de óleo, Regulagem, Lavagem...)" autocomplete="off">
+        <input type="text" id="os-item-input" name="pending_item" placeholder="Descreva um item (ex: Troca de óleo, Regulagem, Lavagem...)" autocomplete="off">
         <button type="button" class="btn" onclick="addOsItem()">+ Adicionar</button>
       </div>
       <ul id="os-items-list" class="os-items-list"></ul>
@@ -190,6 +187,9 @@
       input.value = '';
       input.focus();
     }
+    document.getElementById('os-item-input').addEventListener('keydown', function(event){
+      if(event.key === 'Enter'){event.preventDefault();addOsItem();}
+    });
   </script>
 
   <hr class="divider">
@@ -212,7 +212,7 @@
         {% for o in orders %}
         <tr>
           <td>{{ o.id }}</td>
-          <td>{{ o.service_date or o.created_at[:10] }}</td>
+          <td>{{ (o.service_date or o.created_at)|brdate }}</td>
           <td>{{ o.machine_name or '-' }}</td>
           <td>{{ o.address or '-' }}</td>
           <td>

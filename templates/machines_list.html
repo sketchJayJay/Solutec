@@ -1,60 +1,6 @@
-{% extends "base.html" %}
-{% block title %}Máquinas - Solutec{% endblock %}
-{% block body %}
-<div class="card">
-  <div class="section-header">
-    <div>
-      <div class="section-title">Máquinas</div>
-      <div class="section-sub">Todas as máquinas cadastradas com série, motor, NF e revenda.</div>
-    </div>
-    <a href="{{ url_for('machine_new') }}" class="btn primary">+ Nova máquina</a>
-  </div>
-
-  {% if rows %}
-  <table class="table">
-    <thead>
-      <tr>
-        <th>Máquina</th>
-        <th>Cliente</th>
-        <th>NF</th>
-        <th>Série</th>
-        <th>Motor</th>
-        <th>Entrega</th>
-        <th>Revenda</th>
-        <th>Mapa</th>
-        <th></th>
-      </tr>
-    </thead>
-    <tbody>
-      {% for m in rows %}
-      <tr>
-        <td>{{ m.name }}</td>
-        <td>{{ m.client_name }}</td>
-        <td>{{ m.nf_number or '-' }}</td>
-        <td>{{ m.serial_number or '-' }}</td>
-        <td>{{ m.engine_number or '-' }}</td>
-        <td>{{ m.delivery_date or '-' }}</td>
-        <td>{{ m.reseller_name }}</td>
-        <td class="map-cell">
-          {% if m.delivery_location_url %}
-            <a href="{{ build_maps_url(m.delivery_location_url) }}" target="_blank" class="map-link">📍</a>
-            {% set loc = m.delivery_location_url %}
-            {% if loc.startswith('http') %}
-              <span class="map-label">Ver no mapa</span>
-            {% else %}
-              <span class="map-label">{{ loc|truncate(32, True, '...') }}</span>
-            {% endif %}
-          {% else %}
-            <span class="muted">-</span>
-          {% endif %}
-        </td>
-        <td><a class="btn" href="{{ url_for('machine_detail', machine_id=m.id) }}">Detalhes</a></td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  {% else %}
-    <p class="muted">Nenhuma máquina cadastrada.</p>
-  {% endif %}
-</div>
+{% extends 'base.html' %}{% block title %}Máquinas · Solutec{% endblock %}{% block body %}
+<div class="page-header"><div><div class="eyebrow">FROTA E EQUIPAMENTOS</div><h1>Máquinas<span class="title-dot">.</span></h1><p>Proprietários, identificação e histórico de cada equipamento.</p></div><a class="btn primary" href="{{ url_for('machine_new') }}">{{ icon('plus') }}Nova máquina</a></div>
+<div class="card"><div class="filter-bar"><form class="filter-search" method="get">{{ icon('search') }}<input type="hidden" name="status" value="{{ status }}"><input name="q" value="{{ q }}" aria-label="Buscar máquinas" placeholder="Nome, proprietário, série, motor ou NF"><button class="btn" type="submit">Buscar</button></form><span class="result-count">{{ rows|length }} registro{{ 's' if rows|length!=1 else '' }} encontrado{{ 's' if rows|length!=1 else '' }}</span></div><nav class="tabs" aria-label="Filtrar máquinas">{% for key,label in [('active','Todas'),('review','A conferir'),('orphan','Sem proprietário'),('archived','Arquivadas')] %}<a class="{{ 'active' if status==key else '' }}" href="{{ url_for('machines_list',status=key,q=q) }}">{{ label }}<span>{{ counts[key] }}</span></a>{% endfor %}</nav>
+{% if status=='orphan' %}<div class="notice compact"><span class="notice-icon">{{ icon('alert') }}</span><div><strong>Vínculo de proprietário ausente</strong><p>O número do antigo cliente não corresponde a um cadastro existente. Abra a ficha para conferir o histórico e os identificadores antes de corrigir ou arquivar.</p></div></div>{% endif %}
+{% if rows %}<table class="table"><thead><tr><th>Máquina</th><th>Proprietário</th><th>Identificação</th><th>Entrega</th><th>Situação</th><th></th></tr></thead><tbody>{% for m in rows %}<tr><td><a class="record-title" href="{{ url_for('machine_detail',machine_id=m.id) }}"><span class="mini-machine">{{ icon('machine') }}</span><span><strong>{{ m.name }}</strong><small>#{{ m.id }} · {{ m.brand or 'Marca não informada' }} · {{ m.model or 'Modelo não informado' }}</small></span></a></td><td><strong>{{ m.client_name or 'Não identificado' }}</strong><div class="muted" style="font-size:9px;margin-top:4px">{{ m.reseller_name or 'Revenda não encontrada' }}</div></td><td><div><div class="identifier-line"><small>SÉRIE</small><span class="mono">{{ m.serial_number or '—' }}</span></div><div class="identifier-line"><small>MOTOR</small><span class="mono">{{ m.engine_number or '—' }}</span></div><div class="identifier-line"><small>NF</small><span class="mono">{{ m.nf_number or '—' }}</span></div></div></td><td>{{ m.delivery_date|brdate }}</td><td><div class="badges">{% if m.archived_at %}<span class="badge archived">Arquivada</span>{% elif m.issues %}{% for issue in m.issues %}<span class="badge warn">{{ issue }}</span>{% endfor %}{% else %}<span class="badge ok">{{ icon('check') }}Vínculo conferido</span>{% endif %}</div></td><td><a class="btn btn-sm" href="{{ url_for('machine_detail',machine_id=m.id) }}">Abrir ficha {{ icon('arrow') }}</a></td></tr>{% endfor %}</tbody></table>{% else %}<div class="empty-state">{{ icon('search') }}<h3>Nenhuma máquina encontrada</h3><p>Confira o termo pesquisado ou escolha outro filtro.</p><a class="btn" href="{{ url_for('machines_list') }}">Limpar filtros</a></div>{% endif %}</div>
 {% endblock %}
