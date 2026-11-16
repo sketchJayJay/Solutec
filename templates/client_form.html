@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}{% if client is defined %}Editar cliente - Solutec{% else %}Novo cliente - Solutec{% endif %}{% endblock %}
+{% block body %}
+<div class="card">
+  <div class="section-title">
+    {% if client is defined %}Editar cliente{% else %}Cadastro de cliente{% endif %}
+  </div>
+  <div class="section-sub">Dados do proprietário e endereços.</div>
+
+  <form method="post" class="grid2">
+    {% if g.user.role == 'admin' %}
+    <div>
+      <label>Revenda responsável</label>
+      <select name="reseller_id" required>
+        <option value="">Selecione...</option>
+        {% for r in resellers %}
+          <option value="{{ r.id }}"
+                  {% if client is defined and client.reseller_id == r.id %}selected{% endif %}>
+            {{ r.fantasy_name or r.razao_social }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+    {% endif %}
+
+    <div>
+      <label>Nome do proprietário</label>
+      <input name="name" required value="{{ client.name if client is defined else '' }}">
+    </div>
+
+    <div>
+      <label>CPF</label>
+      <input name="cpf" value="{{ client.cpf if client is defined else '' }}">
+    </div>
+
+    <div>
+      <label>RG</label>
+      <input name="rg" value="{{ client.rg if client is defined else '' }}">
+    </div>
+
+    <div>
+      <label>Contato (WhatsApp)</label>
+      <input name="phone" placeholder="(DDD) 9XXXX-XXXX" value="{{ client.phone if client is defined else '' }}">
+    </div>
+
+
+    <div>
+      <label>Endereço faturamento</label>
+      <textarea name="billing_address" rows="3"
+                placeholder="Rua, nº, bairro, cidade, UF, CEP">{{ client.billing_address if client is defined else '' }}</textarea>
+    </div>
+
+    <div>
+      <label>Endereço de entrega</label>
+      <textarea name="delivery_address" rows="3"
+                placeholder="Fazenda, córrego, cidade, ponto de referência...">{{ client.delivery_address if client is defined else '' }}</textarea>
+    </div>
+
+    <div>
+      <label>Link localização (Google Maps)</label>
+      <div class="muted">
+        Cole o link completo do Maps ou digite o nome da fazenda / local que o sistema monta o link.
+      </div>
+      <input name="delivery_location_url"
+             placeholder="https://maps.app.goo.gl/..."
+             value="{{ client.delivery_location_url if client is defined else '' }}">
+    </div>
+
+    <div style="grid-column:1/-1; margin-top:8px;">
+      <button class="btn primary">Salvar cliente</button>
+      <a href="{{ url_for('clients_list') }}" class="btn">Cancelar</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

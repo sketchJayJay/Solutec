@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8" />
+  <title>Ficha da máquina - {{ m.name }}</title>
+  <style>
+    *{ box-sizing:border-box; }
+    body{
+      font-family: system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+      margin:0;
+      padding:18px;
+      background:#020617;
+      color:#0f172a;
+      font-size:12px;
+    }
+    .page{
+      max-width:900px;
+      margin:0 auto;
+      background:#ffffff;
+      border-radius:14px;
+      padding:18px 20px 24px;
+      box-shadow:0 18px 55px rgba(15,23,42,.35);
+    }
+    .header{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      background:linear-gradient(90deg,#0b1220,#1e293b);
+      border-radius:12px;
+      padding:10px 14px;
+      margin-bottom:14px;
+      color:#e5e7eb;
+    }
+    .brand{
+      display:flex;
+      align-items:center;
+      gap:10px;
+    }
+    .brand-logo img{
+      height:180px;
+    }
+    .brand-title{
+      font-weight:700;
+      font-size:18px;
+      text-transform:uppercase;
+      letter-spacing:.08em;
+    }
+    .brand-sub{
+      font-size:11px;
+      color:#cbd5f5;
+      margin-top:2px;
+    }
+    .machine-id{
+      text-align:right;
+    }
+    .machine-id-main{
+      font-size:18px;
+      font-weight:800;
+      color:#f97316;
+    }
+    .machine-id-sub{
+      font-size:11px;
+      color:#e5e7eb;
+      margin-top:4px;
+    }
+
+    .grid-2{
+      display:flex;
+      gap:10px;
+      margin-bottom:6px;
+    }
+    .col{ flex:1; }
+
+    .block{
+      border-radius:10px;
+      padding:8px 10px;
+      margin-top:8px;
+      border:1px solid #e5e7eb;
+      background:#f9fafb;
+    }
+    .block-title{
+      font-size:11px;
+      font-weight:700;
+      text-transform:uppercase;
+      letter-spacing:.12em;
+      color:#0f172a;
+      margin-bottom:4px;
+      border-left:3px solid #f97316;
+      padding-left:6px;
+    }
+    .field-line{
+      font-size:12px;
+      margin:2px 0;
+    }
+    .muted{ color:#6b7280; }
+
+    .grid-spec{
+      display:flex;
+      flex-wrap:wrap;
+      gap:6px 18px;
+      margin-top:4px;
+    }
+    .grid-spec .field-line{
+      min-width:190px;
+    }
+
+    .obs-box{
+      border-radius:10px;
+      border:1px dashed #cbd5f5;
+      padding:6px 8px;
+      min-height:40px;
+      white-space:pre-wrap;
+      background:#ffffff;
+    }
+
+    @media print{
+      body{
+        margin:0;
+        padding:0;
+        background:#ffffff;
+      }
+      .page{
+        box-shadow:none;
+        border-radius:0;
+        padding:10mm;
+      }
+    }
+  </style>
+</head>
+<body onload="window.print()">
+  <div class="page">
+    <div class="header">
+      <div class="brand">
+        <div class="brand-logo">
+          <img src="{{ url_for('static', filename='logo.png') }}" alt="Solutec">
+        </div>
+        <div>
+          <div class="brand-title">Solutec Implementos Agrícolas</div>
+          <div class="brand-sub">
+            Revenda: {{ m.reseller_name }}{% if m.cnpj %} · CNPJ: {{ m.cnpj }}{% endif %}<br>
+            Tel: {{ m.reseller_phone or '-' }}
+          </div>
+        </div>
+      </div>
+      <div class="machine-id">
+        <div class="machine-id-main">{{ m.name }}</div>
+        <div class="machine-id-sub">
+          Cliente: {{ m.client_name }}{% if m.cpf %} · CPF: {{ m.cpf }}{% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="col">
+        <div class="block">
+          <div class="block-title">Dados do cliente</div>
+          <div class="field-line"><strong>Nome:</strong> {{ m.client_name }}</div>
+          <div class="field-line"><strong>CPF:</strong> {{ m.cpf or '-' }}</div>
+          <div class="field-line"><strong>Endereço faturamento:</strong> {{ m.billing_address or '-' }}</div>
+          <div class="field-line"><strong>Endereço entrega:</strong> {{ m.delivery_address or '-' }}</div>
+        </div>
+      </div>
+      <div class="col">
+        <div class="block">
+          <div class="block-title">Dados da revenda</div>
+          <div class="field-line"><strong>Revenda:</strong> {{ m.reseller_name }}</div>
+          <div class="field-line"><strong>CNPJ:</strong> {{ m.cnpj or '-' }}</div>
+          <div class="field-line"><strong>Telefone:</strong> {{ m.reseller_phone or '-' }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="block-title">Dados da máquina</div>
+      <div class="grid-spec">
+        <div class="field-line"><strong>Máquina:</strong> {{ m.name }}</div>
+        <div class="field-line"><strong>Marca:</strong> {{ m.brand or '-' }}</div>
+        <div class="field-line"><strong>Modelo:</strong> {{ m.model or '-' }}</div>
+        <div class="field-line"><strong>Modelo motor:</strong> {{ m.motor_model or '-' }}</div>
+        <div class="field-line"><strong>Nº NF:</strong> {{ m.nf_number or '-' }}</div>
+        <div class="field-line"><strong>Nº série:</strong> {{ m.serial_number or '-' }}</div>
+        <div class="field-line"><strong>Nº motor:</strong> {{ m.engine_number or '-' }}</div>
+        <div class="field-line"><strong>Data entrega:</strong> {{ m.delivery_date or '-' }}</div>
+        <div class="field-line"><strong>Horímetro inicial:</strong> {{ m.initial_hours or '-' }}</div>
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="block-title">Observações</div>
+      <div class="obs-box">
+        {{ m.obs_text or '' }}
+      </div>
+    </div>
+  </div>
+</body>
+</html>

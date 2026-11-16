@@ -1,0 +1,230 @@
+{% extends "base.html" %}
+{% block title %}Cliente {{ client.name }} - Solutec{% endblock %}
+{% block body %}
+<div class="card">
+  <div class="section-header">
+    <div>
+      <div class="section-title">Cliente: {{ client.name }}</div>
+      <div class="section-sub">
+        Revenda: <strong>{{ client.reseller_name }}</strong>
+        {% if client.delivery_location_url %}
+          · <span class="badge-map">📍 Localização salva</span>
+        {% endif %}
+      </div>
+    </div>
+    <div style="display:flex;gap:.5rem;align-items:center">
+      <a href="{{ url_for('clients_list') }}" class="btn">Voltar</a>
+      <a href="{{ url_for('client_edit', client_id=client.id) }}" class="btn primary">Editar cliente</a>
+      <form method="post"
+            action="{{ url_for('client_delete', client_id=client.id) }}"
+            onsubmit="return confirm('Excluir este cliente e todos os registros vinculados?');">
+        <button type="submit" class="btn btn-danger">🗑 Excluir cliente</button>
+      </form>
+      <form method="post" action="{{ url_for('client_delete', client_id=client.id) }}" onsubmit="return confirm('Excluir este cliente e todos os registros vinculados?');">
+        <button type="submit" class="btn btn-danger">🗑 Excluir cliente</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div>
+      <h3 class="field-title">Dados do cliente</h3>
+      <p class="field-line"><strong>Nome:</strong> {{ client.name }}</p>
+      <p class="field-line"><strong>CPF:</strong> {{ client.cpf or '-' }}</p>
+      <p class="field-line"><strong>RG:</strong> {{ client.rg or '-' }}</p>
+      <p class="field-line"><strong>Contato (WhatsApp):</strong>
+        {% if client.phone %}
+          <a href="{{ whatsapp_url(client.phone, client.name) }}" target="_blank" rel="noopener" class="btn whatsapp">💬 Chamar no WhatsApp</a>
+          <span class="muted" style="margin-left:6px;">{{ client.phone }}</span>
+        {% else %}
+          <span class="muted">-</span>
+        {% endif %}
+      </p>
+      <p class="field-line"><strong>Endereço faturamento:</strong><br>{{ client.billing_address or '-' }}</p>
+      <p class="field-line"><strong>Endereço entrega:</strong><br>{{ client.delivery_address or '-' }}</p>
+    </div>
+    <div>
+      <h3 class="field-title">Localização da entrega</h3>
+      {% if client.delivery_location_url %}
+        <p class="field-line">
+          <strong>Google Maps:</strong><br>
+          <a href="{{ build_maps_url(client.delivery_location_url) }}" target="_blank" class="btn">📍 Ver no mapa</a>
+          <div class="muted" style="margin-top:2px;">Abre direto no Google Maps.</div>
+        </p>
+      {% else %}
+        <p class="muted">Nenhum link de localização salvo no cadastro do cliente.</p>
+      {% endif %}
+
+      <div class="field-line" style="margin-top:10px;">
+        {% if client.delivery_location_url %}
+          {% set loc_for_wa = build_maps_url(client.delivery_location_url) %}
+          {% if loc_for_wa %}
+            {% set wa_text = 'Localização do cliente ' ~ client.name ~ ': ' ~ loc_for_wa %}
+            <a href="{{ whatsapp_share_url(wa_text) }}" target="_blank" rel="noopener" class="btn">📲 Enviar localização no WhatsApp</a>
+            <div class="muted" style="margin-top:2px;">Clicou, abre o WhatsApp e você escolhe o contato.</div>
+          {% endif %}
+        {% else %}
+          <div class="muted">Depois de salvar um link de localização no cliente, aparece aqui o botão de WhatsApp.</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <hr class="divider">
+
+  <h3 class="section-title" style="margin-bottom:6px;">Máquinas do cliente</h3>
+  <div class="section-sub" style="margin-bottom:10px;">Lista de máquinas cadastradas para este cliente.</div>
+
+  {% if machines %}
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Máquina</th>
+          <th>Marca / Modelo</th>
+          <th>Nº NF</th>
+          <th>Nº série</th>
+          <th>Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for m in machines %}
+        <tr>
+          <td>{{ m.name }}</td>
+          <td>{{ (m.brand or '-') ~ ' / ' ~ (m.model or '-') }}</td>
+          <td>{{ m.nf_number or '-' }}</td>
+          <td>{{ m.serial_number or '-' }}</td>
+          <td>
+            <a href="{{ url_for('machine_detail', machine_id=m.id) }}" class="btn btn-sm">Ficha da máquina</a>
+            <a href="{{ url_for('machine_edit', machine_id=m.id) }}" class="btn btn-sm">Editar</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="muted">Nenhuma máquina cadastrada para este cliente.</p>
+  {% endif %}
+
+  <div style="margin-top:10px;">
+    <a href="{{ url_for('machine_new', client_id=client.id) }}" class="btn primary">+ Cadastrar nova máquina para este cliente</a>
+  </div>
+
+  <hr class="divider">
+
+  <h3 class="section-title" style="margin-bottom:6px;">Nova OS rápida</h3>
+  <div class="section-sub" style="margin-bottom:10px;">Descreva item por item o que foi feito e gere a OS para impressão.</div>
+
+  <form method="post" action="{{ url_for('client_os_new', client_id=client.id) }}" id="os-form">
+    <div class="grid2">
+      <div>
+        <label>Máquina (opcional)</label>
+        <select name="machine_id">
+          <option value="">Selecione...</option>
+          {% for m in machines %}
+            <option value="{{ m.id }}">{{ m.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label>Data do serviço</label>
+        <input type="date" name="service_date">
+      </div>
+    </div>
+
+    <div style="margin-top:10px;">
+      <label class="field-title">Itens executados</label>
+      <div class="os-item-line">
+        <input type="text" id="os-item-input" placeholder="Descreva um item (ex: Troca de óleo, Regulagem, Lavagem...)" autocomplete="off">
+        <button type="button" class="btn" onclick="addOsItem()">+ Adicionar</button>
+      </div>
+      <ul id="os-items-list" class="os-items-list"></ul>
+      <div class="muted" style="margin-top:4px;">Você pode adicionar vários itens, um por vez.</div>
+    </div>
+
+    <div style="margin-top:10px;">
+      <label class="field-title">Observações gerais</label>
+      <textarea name="obs" rows="4" placeholder="Informações complementares, alertas, recomendações ao cliente..."></textarea>
+    </div>
+
+    <div style="margin-top:10px;">
+      <label class="field-title">Endereço / local do atendimento</label>
+      <textarea name="address" rows="2" placeholder="Se diferente do endereço de entrega, descreva aqui...">{{ client.delivery_address or '' }}</textarea>
+    </div>
+
+    <div style="margin-top:10px;">
+      <label class="field-title">Link ou nome para localização (Google Maps)</label>
+      <input type="text" name="maps_url" placeholder="Cole o link do Google Maps ou digite o nome da fazenda / local" value="{{ client.delivery_location_url or '' }}">
+      <div class="muted" style="margin-top:2px;">Se for só o nome (ex: Fazenda Boa Vista), o sistema monta o link de busca do Maps.</div>
+    </div>
+
+    <div style="margin-top:12px;">
+      <button class="btn primary">Salvar OS / Gerar OS</button>
+    </div>
+  </form>
+
+  <script>
+    function addOsItem(){
+      const input = document.getElementById('os-item-input');
+      const list = document.getElementById('os-items-list');
+      const value = (input.value || '').trim();
+      if(!value) return;
+
+      const li = document.createElement('li');
+      li.className = 'os-item-tag';
+      li.textContent = value;
+
+      const hidden = document.createElement('input');
+      hidden.type = 'hidden';
+      hidden.name = 'items[]';
+      hidden.value = value;
+      li.appendChild(hidden);
+
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = '×';
+      btn.className = 'os-item-remove';
+      btn.onclick = function(){ li.remove(); };
+      li.appendChild(btn);
+
+      list.appendChild(li);
+      input.value = '';
+      input.focus();
+    }
+  </script>
+
+  <hr class="divider">
+
+  <h3 class="section-title" style="margin-bottom:6px;">OS do cliente</h3>
+  <div class="section-sub" style="margin-bottom:10px;">Histórico das últimas OS geradas para este cliente.</div>
+
+  {% if orders %}
+    <table class="table">
+      <thead>
+        <tr>
+          <th>#</th>
+          <th>Data</th>
+          <th>Máquina</th>
+          <th>Endereço</th>
+          <th>Ações</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for o in orders %}
+        <tr>
+          <td>{{ o.id }}</td>
+          <td>{{ o.service_date or o.created_at[:10] }}</td>
+          <td>{{ o.machine_name or '-' }}</td>
+          <td>{{ o.address or '-' }}</td>
+          <td>
+            <a href="{{ url_for('service_order_detail', order_id=o.id) }}" class="btn btn-sm">Ver OS</a>
+            <a href="{{ url_for('service_order_print', order_id=o.id) }}" class="btn btn-sm" target="_blank">Imprimir</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p class="muted">Nenhuma OS cadastrada ainda.</p>
+  {% endif %}
+</div>
+{% endblock %}

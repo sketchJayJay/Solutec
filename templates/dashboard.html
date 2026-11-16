@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% block title %}Painel - Solutec{% endblock %}
+{% block body %}
+<div class="dashboard-grid">
+  <section class="card hero-card">
+    <div>
+      <div class="hero-kicker">
+        {% if g.user.role == 'admin' %}Visão geral da Matriz{% else %}Painel da revenda{% endif %}
+      </div>
+      {% if first_run %}
+      <div class="welcome-banner">
+        <div class="welcome-title">Bem-vindo ao Solutec!</div>
+        <div class="welcome-steps">
+          <span>1. Cadastre a matriz ou revenda principal.</span>
+          <span>2. Cadastre pelo menos um cliente.</span>
+          <span>3. Cadastre a primeira máquina desse cliente.</span>
+        </div>
+      </div>
+      {% endif %}
+      {% if g.user.role == 'revenda' %}
+      <div class="hero-subbrand">
+        {{ g.user.reseller_fantasy or g.user.reseller_razao }}
+      </div>
+      {% endif %}
+      <h1 class="hero-title">Controle profissional de máquinas e clientes</h1>
+      <p class="hero-text">
+        Pesquise por série, motor, NF, cliente, fazenda ou revenda em um único lugar.
+      </p>
+
+      <div class="hero-meta">
+        <span class="hero-pill">🚜 Máquinas</span>
+        <span class="hero-pill">📍 Clientes & Fazendas</span>
+        <span class="hero-pill">🏪 Revendas</span>
+      </div>
+
+      <form action="{{ url_for('search') }}" method="get" class="search-bar">
+        <input type="text" name="q" placeholder="Buscar por cliente, máquina, NF, série, motor, cidade, revenda..." required>
+        <button type="submit">Buscar</button>
+      </form>
+
+      <div class="kpis">
+        <div class="kpi kpi-machines">
+          <div class="kpi-label"><span class="kpi-icon">🚜</span>Máquinas cadastradas</div>
+          <div class="kpi-value">{{ total_machines }}</div>
+          <div class="kpi-foot">Total geral do sistema</div>
+        </div>
+        <div class="kpi kpi-clients">
+          <div class="kpi-label"><span class="kpi-icon">👥</span>Clientes atendidos</div>
+          <div class="kpi-value">{{ total_clients }}</div>
+          <div class="kpi-foot">Total geral do sistema</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="hero-shortcuts">
+      <a href="{{ url_for('client_new') }}" class="shortcut-pill">+ Novo cliente</a>
+      <a href="{{ url_for('machine_new') }}" class="shortcut-pill">+ Nova máquina</a>
+      {% if g.user.role == 'admin' %}
+      <a href="{{ url_for('resellers') }}" class="shortcut-pill">+ Nova revenda</a>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="card tiles-card">
+
+<section class="card qr-card">
+  <div class="section-title">Acesse pelo celular</div>
+  <p class="muted">
+    Escaneie para acessar o sistema pela internet, de qualquer lugar:
+  </p>
+  <div class="qr-wrapper">
+    <img
+      src="https://api.qrserver.com/v1/create-qr-code/?size=140x140&data={{ base_url }}"
+      alt="QR Code para abrir o sistema no celular">
+    <div class="qr-url">{{ base_url }}</div>
+  </div>
+</section>
+
+    <div class="section-title">Atalhos rápidos</div>
+    <div class="tiles-grid">
+      <a class="tile" href="{{ url_for('machines_list') }}">
+        <div class="tile-tag">F1</div>
+        <div class="tile-title">Máquinas</div>
+        <div class="tile-sub">Listar, consultar e abrir OBS das máquinas.</div>
+      </a>
+
+      <a class="tile" href="{{ url_for('clients_list') }}">
+        <div class="tile-tag">F2</div>
+        <div class="tile-title">Clientes</div>
+        <div class="tile-sub">Ver todos os proprietários e endereços.</div>
+      </a>
+
+      <a class="tile" href="{{ url_for('client_new') }}">
+        <div class="tile-tag">F3</div>
+        <div class="tile-title">Novo cliente</div>
+        <div class="tile-sub">Cadastrar um cliente com NF e localização.</div>
+      </a>
+
+      <a class="tile" href="{{ url_for('machine_new') }}">
+        <div class="tile-tag">F4</div>
+        <div class="tile-title">Nova máquina</div>
+        <div class="tile-sub">Registrar entrega, NF, série, motor e horímetro.</div>
+      </a>
+
+      {% if g.user.role == 'admin' %}
+      <a class="tile" href="{{ url_for('resellers') }}">
+        <div class="tile-tag">F5</div>
+        <div class="tile-title">Revendas</div>
+        <div class="tile-sub">Criar e administrar revendas autorizadas.</div>
+      </a>
+      {% endif %}
+
+      <a class="tile" href="{{ url_for('search') }}">
+        <div class="tile-tag">F6</div>
+        <div class="tile-title">Consulta avançada</div>
+        <div class="tile-sub">Buscar em clientes, máquinas e revendas.</div>
+      </a>
+    </div>
+  </section>
+
+  <section class="card last-machines-card">
+    <div class="section-header">
+      <div>
+        <div class="section-title">Últimas máquinas registradas</div>
+        <div class="section-sub">Os cadastros mais recentes feitos no sistema</div>
+      </div>
+    </div>
+    {% if last_machines %}
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Máquina</th>
+            <th>Cliente</th>
+            <th>Série</th>
+            <th>Entrega</th>
+            <th>Revenda</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for m in last_machines %}
+          <tr>
+            <td>{{ m.name }}</td>
+            <td>{{ m.client_name }}</td>
+            <td>{{ m.serial_number or '-' }}</td>
+            <td>{{ m.delivery_date or '-' }}</td>
+            <td>{{ m.reseller_name }}</td>
+            <td><a class="btn" href="{{ url_for('machine_detail', machine_id=m.id) }}">Abrir</a></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p class="muted">Nenhuma máquina cadastrada ainda.</p>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

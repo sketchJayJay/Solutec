@@ -1,0 +1,18 @@
+services:
+  solutec:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      PORT: "8000"
+      SOLUTEC_DATA_DIR: /data
+      SOLUTEC_UPLOAD_DIR: /data/uploads
+      SECRET_KEY: ${SECRET_KEY:?Defina SECRET_KEY no .env}
+      COOKIE_SECURE: "true"
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-solutec.divinomg@gmail.com}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-ChangeMe-Now-2026!}
+    volumes:
+      - solutec_data:/data
+volumes:
+  solutec_data:

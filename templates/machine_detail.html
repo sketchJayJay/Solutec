@@ -1,0 +1,205 @@
+{% extends "base.html" %}
+{% block title %}Máquina {{ m.name }} - Solutec{% endblock %}
+{% block body %}
+
+<style>
+  .photo-grid{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-start;}
+  .photo-item{position:relative;width:120px;border-radius:10px;overflow:hidden;border:1px solid rgba(148,163,184,.4);background:rgba(15,23,42,.25);}
+  .photo-thumb{width:100%;padding:0;border:0;background:none;cursor:pointer;display:block;}
+  .photo-thumb img{width:100%;display:block;}
+
+  .photo-del-btn{position:absolute;top:6px;right:6px;
+    display:flex;align-items:center;justify-content:center;
+    width:30px;height:30px;border-radius:9px;
+    background:rgba(15,23,42,.78);color:#fff;
+    border:1px solid rgba(148,163,184,.35);
+    cursor:pointer;
+  }
+  .photo-del-btn:hover{filter:brightness(1.08);}
+
+  .photo-modal{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px;}
+  .photo-modal[hidden]{display:none !important;}
+  .photo-modal-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.68);}
+  .photo-modal-content{position:relative;z-index:1;max-width:96vw;max-height:92vh;
+    background:rgba(15,23,42,.92);
+    border:1px solid rgba(148,163,184,.35);
+    border-radius:18px;padding:12px;
+    box-shadow:0 30px 80px rgba(0,0,0,.45);
+  }
+  .photo-modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-bottom:10px;}
+  #photoModalImg{max-width:94vw;max-height:78vh;object-fit:contain;display:block;border-radius:14px;}
+  .photo-modal-close{position:absolute;top:10px;right:10px;
+    width:36px;height:36px;border-radius:12px;
+    border:1px solid rgba(148,163,184,.35);
+    background:rgba(15,23,42,.78);
+    color:#fff;cursor:pointer;
+  }
+  .photo-modal-msg{color:rgba(226,232,240,.95);font-size:14px;margin-top:8px;text-align:center;}
+</style>
+
+<div class="card">
+  <div class="section-header">
+    <div>
+      <div class="section-title">Máquina: {{ m.name }}</div>
+      <div class="section-sub">
+        Cliente: <strong>{{ m.client_name }}</strong> · Revenda: <strong>{{ m.reseller_name }}</strong>
+        {% if m.delivery_location_url %}
+          <span class="badge-map">📍 Localização salva</span>
+        {% endif %}
+      </div>
+    </div>
+    <div class="section-actions">
+      <a class="btn" href="{{ url_for('machine_print', machine_id=m.id) }}" target="_blank">Versão para impressão</a>
+      <a class="btn primary" href="{{ url_for('machine_edit', machine_id=m.id) }}">Editar máquina</a>
+      <a href="{{ url_for('machines_list') }}" class="btn">Voltar</a>
+    </div>
+  </div>
+
+  <div class="grid2" style="margin-top:14px;">
+    <div>
+      <h3 class="field-title">Dados da máquina</h3>
+      <p class="field-line"><strong>Máquina:</strong> {{ m.name }}</p>
+      <p class="field-line"><strong>Marca:</strong> {{ m.brand or '-' }}</p>
+      <p class="field-line"><strong>Modelo/versão:</strong> {{ m.model or '-' }}</p>
+      <p class="field-line"><strong>Modelo motor:</strong> {{ m.motor_model or '-' }}</p>
+      <p class="field-line"><strong>Nº NF:</strong> {{ m.nf_number or '-' }}</p>
+      <p class="field-line"><strong>Nº série:</strong> {{ m.serial_number or '-' }}</p>
+      <p class="field-line"><strong>Nº motor:</strong> {{ m.engine_number or '-' }}</p>
+      <p class="field-line"><strong>Data entrega:</strong> {{ m.delivery_date or '-' }}</p>
+      <p class="field-line"><strong>Horímetro inicial:</strong> {{ m.initial_hours or '-' }}</p>
+    </div>
+    <div>
+      <h3 class="field-title">Dados do cliente / localização</h3>
+      <p class="field-line"><strong>Cliente:</strong> {{ m.client_name }}</p>
+      <p class="field-line"><strong>CPF:</strong> {{ m.cpf or '-' }}</p>
+      <p class="field-line"><strong>Endereço faturamento:</strong> {{ m.billing_address or '-' }}</p>
+      <p class="field-line"><strong>Endereço entrega:</strong> {{ m.delivery_address or '-' }}</p>
+
+      {% if m.delivery_location_url %}
+        <p class="field-line" style="margin-top:8px;">
+          <strong>Localização (Google Maps):</strong><br>
+          <a href="{{ m.delivery_location_url }}" target="_blank" class="btn">📍 Ver no mapa</a>
+          <span class="muted" style="display:block;margin-top:2px;">Abre direto no Google Maps.</span>
+        </p>
+      {% else %}
+        <p class="field-line muted" style="margin-top:8px;">
+          Nenhuma localização salva ainda para esta máquina. Use o cadastro do cliente para registrar um link do Google Maps.
+        </p>
+      {% endif %}
+    </div>
+  </div>
+
+  <hr class="divider" style="margin:16px 0; border-color:rgba(148,163,184,.5);">
+
+  <form method="post" enctype="multipart/form-data">
+    <div class="grid2">
+      <div>
+        <h3 class="field-title">OBS da máquina</h3>
+        <textarea name="obs_text" rows="8" placeholder="Histórico de atendimentos, peças trocadas, problemas encontrados..." style="width:100%;">{{ m.obs_text or '' }}</textarea>
+      </div>
+      <div>
+        <h3 class="field-title">Anexar fotos</h3>
+        <input type="file" name="photos" multiple accept="image/*" style="margin-bottom:8px;">
+
+        {% if photos %}
+          <div class="photo-grid">
+            {% for p in photos %}
+              <div class="photo-item">
+                <button type="button" class="photo-thumb" data-src="{{ url_for('uploads', filename=p.filename) }}" aria-label="Abrir foto">
+                  <img src="{{ url_for('uploads', filename=p.filename) }}" alt="Foto anexada">
+                </button>
+
+                <!-- IMPORTANTE: sem form dentro de form (isso quebrava o excluir). -->
+                <button
+                  type="submit"
+                  class="photo-del-btn"
+                  title="Excluir"
+                  formaction="{{ url_for('machine_photo_delete', machine_id=m.id, photo_id=p.id) }}"
+                  formmethod="post"
+                  onclick="event.stopPropagation(); return confirm('Excluir esta imagem?');"
+                >🗑️</button>
+              </div>
+            {% endfor %}
+          </div>
+          <p class="muted" style="margin-top:6px;">Clique numa foto para ver em tamanho inteiro. As mais recentes aparecem primeiro.</p>
+        {% else %}
+          <p class="muted">Nenhuma foto anexada ainda.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <div style="margin-top:12px;">
+      <button class="btn primary">Salvar OBS e anexos</button>
+    </div>
+  </form>
+
+</div>
+
+<!-- Modal para abrir foto inteira -->
+<div id="photoModal" class="photo-modal" hidden>
+  <div class="photo-modal-backdrop" data-close="1"></div>
+  <div class="photo-modal-content">
+    <button type="button" class="photo-modal-close" data-close="1" title="Fechar">✖</button>
+    <div class="photo-modal-actions">
+      <a id="photoModalLink" href="#" target="_blank" class="btn">Abrir em outra aba</a>
+    </div>
+    <img id="photoModalImg" src="" alt="Foto em tamanho grande">
+    <div id="photoModalMsg" class="photo-modal-msg" style="display:none;"></div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const modal = document.getElementById('photoModal');
+  const img = document.getElementById('photoModalImg');
+  const link = document.getElementById('photoModalLink');
+  const msg = document.getElementById('photoModalMsg');
+  const thumbs = document.querySelectorAll('.photo-thumb');
+
+  function openModal(src){
+    msg.style.display = 'none';
+    msg.textContent = '';
+    img.src = '';
+    link.href = src;
+    modal.hidden = false;
+    document.body.style.overflow = 'hidden';
+
+    img.onload = () => {};
+    img.onerror = () => {
+      msg.textContent = 'Não consegui abrir essa imagem. Tente "Abrir em outra aba".';
+      msg.style.display = 'block';
+    };
+    img.src = src;
+  }
+
+  function closeModal(){
+    modal.hidden = true;
+    img.src = '';
+    link.href = '#';
+    msg.style.display = 'none';
+    msg.textContent = '';
+    document.body.style.overflow = '';
+  }
+
+  thumbs.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const src = btn.dataset.src || '';
+      if(src) openModal(src);
+    });
+  });
+
+  modal.addEventListener('click', (e) => {
+    if (e.target && e.target.dataset && e.target.dataset.close){
+      closeModal();
+    }
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !modal.hidden){
+      closeModal();
+    }
+  });
+})();
+</script>
+
+{% endblock %}

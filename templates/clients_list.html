@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Clientes - Solutec{% endblock %}
+{% block body %}
+<div class="card">
+  <div class="section-header">
+    <div>
+      <div class="section-title">Clientes</div>
+      <div class="section-sub">Proprietários com endereço de faturamento e entrega.</div>
+    </div>
+    <div style="display:flex;gap:.5rem;align-items:center">
+      <form method="get" action="{{ url_for('clients_list') }}" class="search-inline" style="display:flex;gap:.25rem;align-items:center">
+        <input type="text" name="q" value="{{ q or '' }}" placeholder="Buscar por nome, CPF ou telefone..." />
+        <button class="btn" type="submit">Buscar</button>
+      </form>
+      <a href="{{ url_for('client_new') }}" class="btn primary">+ Novo cliente</a>
+    </div>
+  </div>
+
+  {% if rows %}
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Nome</th>
+        <th>CPF</th>
+        <th>Contato</th>
+        <th>Revenda</th>
+        <th>Endereço faturamento</th>
+        <th>Endereço entrega</th>
+        <th>Mapa</th>
+        <th>Ações</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for c in rows %}
+      <tr>
+        <td>{{ c.name }}</td>
+        <td>{{ c.cpf or '-' }}</td>
+        <td>
+          {% if c.phone %}
+            <a href="{{ whatsapp_url(c.phone, c.name) }}" target="_blank" rel="noopener" class="btn whatsapp">💬 WhatsApp</a>
+            <div class="muted" style="margin-top:4px;">{{ c.phone }}</div>
+          {% else %}
+            <span class="muted">-</span>
+          {% endif %}
+        </td>
+        <td>{{ c.reseller_name }}</td>
+        <td>{{ c.billing_address or '-' }}</td>
+        <td>{{ c.delivery_address or '-' }}</td>
+        <td class="map-cell">
+          {% if c.delivery_location_url %}
+            <a href="{{ build_maps_url(c.delivery_location_url) }}" target="_blank" class="map-link">📍</a>
+            {% set loc = c.delivery_location_url %}
+            {% if loc.startswith('http') %}
+              <span class="map-label">Ver no mapa</span>
+            {% else %}
+              <span class="map-label">{{ loc|truncate(32, True, '...') }}</span>
+            {% endif %}
+          {% else %}
+            <span class="muted">-</span>
+          {% endif %}
+        </td>
+        <td>
+          <a href="{{ url_for('client_panel', client_id=c.id) }}" class="btn btn-sm">Abrir painel</a>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+    <p class="muted">Nenhum cliente cadastrado.</p>
+  {% endif %}
+</div>
+{% endblock %}

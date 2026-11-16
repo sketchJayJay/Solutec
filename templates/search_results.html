@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Resultados da busca - Solutec{% endblock %}
+{% block body %}
+<div class="card">
+  <h2>Resultados da busca</h2>
+  <p>Termo buscado: <b>{{ q }}</b></p>
+
+  <table class="table">
+    <thead>
+      <tr>
+        <th>ID máquina</th>
+        <th>Cliente</th>
+        <th>CPF</th>
+        <th>Nº série</th>
+        <th>Nº motor</th>
+        <th>Nº NF</th>
+        <th>Data entrega</th>
+        <th>Revenda</th>
+        <th>Cidade revenda</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}
+      <tr>
+        <td>{{ r.machine_id }}</td>
+        <td>{{ r.client_name }}</td>
+        <td>{{ r.client_cpf }}</td>
+        <td>{{ r.serial_number }}</td>
+        <td>{{ r.engine_number }}</td>
+        <td>{{ r.nf_number }}</td>
+        <td>{{ r.delivery_date }}</td>
+        <td>{{ r.reseller_name }}</td>
+        <td>{{ r.reseller_city }}</td>
+        <td><a class="btn" href="{{ url_for('machine_detail', machine_id=r.machine_id) }}">Abrir</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  {% if not rows %}
+    <p class="muted">Nenhum resultado encontrado.</p>
+  {% endif %}
+</div>
+{% endblock %}

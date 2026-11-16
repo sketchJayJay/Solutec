@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% block title %}Máquinas - Solutec{% endblock %}
+{% block body %}
+<div class="card">
+  <div class="section-header">
+    <div>
+      <div class="section-title">Máquinas</div>
+      <div class="section-sub">Todas as máquinas cadastradas com série, motor, NF e revenda.</div>
+    </div>
+    <a href="{{ url_for('machine_new') }}" class="btn primary">+ Nova máquina</a>
+  </div>
+
+  {% if rows %}
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Máquina</th>
+        <th>Cliente</th>
+        <th>NF</th>
+        <th>Série</th>
+        <th>Motor</th>
+        <th>Entrega</th>
+        <th>Revenda</th>
+        <th>Mapa</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for m in rows %}
+      <tr>
+        <td>{{ m.name }}</td>
+        <td>{{ m.client_name }}</td>
+        <td>{{ m.nf_number or '-' }}</td>
+        <td>{{ m.serial_number or '-' }}</td>
+        <td>{{ m.engine_number or '-' }}</td>
+        <td>{{ m.delivery_date or '-' }}</td>
+        <td>{{ m.reseller_name }}</td>
+        <td class="map-cell">
+          {% if m.delivery_location_url %}
+            <a href="{{ build_maps_url(m.delivery_location_url) }}" target="_blank" class="map-link">📍</a>
+            {% set loc = m.delivery_location_url %}
+            {% if loc.startswith('http') %}
+              <span class="map-label">Ver no mapa</span>
+            {% else %}
+              <span class="map-label">{{ loc|truncate(32, True, '...') }}</span>
+            {% endif %}
+          {% else %}
+            <span class="muted">-</span>
+          {% endif %}
+        </td>
+        <td><a class="btn" href="{{ url_for('machine_detail', machine_id=m.id) }}">Detalhes</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+    <p class="muted">Nenhuma máquina cadastrada.</p>
+  {% endif %}
+</div>
+{% endblock %}

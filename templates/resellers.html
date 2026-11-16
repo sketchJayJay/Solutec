@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}Revendas - Solutec{% endblock %}
+{% block body %}
+<div class="card">
+  <div class="section-header">
+    <div>
+      <div class="section-title">Revendas autorizadas</div>
+      <div class="section-sub">Somente a matriz pode criar e gerenciar logins de revenda.</div>
+    </div>
+  </div>
+
+  <form method="post" class="grid2">
+    <div>
+      <label>Razão social da revenda</label>
+      <input name="razao_social" required>
+    </div>
+    <div>
+      <label>Nome fantasia</label>
+      <input name="fantasy_name">
+    </div>
+    <div>
+      <label>CNPJ</label>
+      <input name="cnpj">
+    </div>
+    <div>
+      <label>Inscrição Estadual / Social</label>
+      <input name="inscr_social">
+    </div>
+    <div>
+      <label>Responsável</label>
+      <input name="responsavel">
+    </div>
+    <div>
+      <label>Telefone</label>
+      <input name="phone">
+    </div>
+    <div>
+      <label>E-mail</label>
+      <input name="email">
+    </div>
+
+    <div>
+      <label>Endereço - rua</label>
+      <input name="address_street">
+    </div>
+    <div>
+      <label>Número</label>
+      <input name="address_number">
+    </div>
+    <div>
+      <label>Cidade</label>
+      <input name="address_city">
+    </div>
+    <div>
+      <label>UF</label>
+      <input name="address_state" maxlength="2">
+    </div>
+    <div>
+      <label>CEP</label>
+      <input name="address_zip">
+    </div>
+
+    <div>
+      <label>E-mail de login (revenda)</label>
+      <input name="login_email" required>
+    </div>
+    <div>
+      <label>Senha do login</label>
+      <input type="password" name="login_password" required>
+    </div>
+
+    <div style="grid-column:1/-1; margin-top:8px;">
+      <button class="btn primary">Salvar revenda e login</button>
+    </div>
+  </form>
+</div>
+
+<div class="card" style="margin-top:16px;">
+  <div class="section-title">Revendas cadastradas</div>
+  {% if rows %}
+  <table class="table">
+    <thead>
+      <tr>
+        <th>Revenda</th>
+        <th>CNPJ</th>
+        <th>Cidade</th>
+        <th>Clientes</th>
+        <th>Máquinas</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}
+      <tr>
+        <td>
+          {% if r.fantasy_name %}
+            {{ r.fantasy_name }}<br>
+            <span class="muted">{{ r.razao_social }}</span>
+          {% else %}
+            {{ r.razao_social }}
+          {% endif %}
+        </td>
+        <td>{{ r.cnpj or '-' }}</td>
+        <td>{{ r.address_city or '-' }}</td>
+        <td>{{ r.total_clients }}</td>
+        <td>{{ r.total_machines }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+    <p class="muted">Nenhuma revenda cadastrada ainda.</p>
+  {% endif %}
+</div>
+{% endblock %}

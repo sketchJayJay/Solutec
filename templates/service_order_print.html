@@ -1,0 +1,277 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8" />
+  <title>OS #{{ o.id }} - {{ o.client_name }}</title>
+  <style>
+    *{ box-sizing:border-box; }
+    body{
+      font-family: system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+      margin:0;
+      padding:18px;
+      background:#020617;
+      color:#0f172a;
+      font-size:12px;
+    }
+    .page{
+      max-width:900px;
+      margin:0 auto;
+      background:#ffffff;
+      border-radius:14px;
+      padding:18px 20px 24px;
+      box-shadow:0 18px 55px rgba(15,23,42,.35);
+    }
+
+    .header{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      background:linear-gradient(90deg,#0b1220,#1e293b);
+      border-radius:12px;
+      padding:10px 14px;
+      margin-bottom:14px;
+      color:#e5e7eb;
+    }
+    .brand{
+      display:flex;
+      align-items:center;
+      gap:10px;
+    }
+    .brand-logo img{
+      height:180px;
+    }
+    .brand-title{
+      font-weight:700;
+      font-size:18px;
+      letter-spacing:.08em;
+      text-transform:uppercase;
+    }
+    .brand-sub{
+      font-size:11px;
+      color:#cbd5f5;
+      margin-top:2px;
+    }
+    .os-id{
+      text-align:right;
+    }
+    .os-id-main{
+      font-size:22px;
+      font-weight:800;
+      color:#f97316;
+    }
+    .os-id-sub{
+      font-size:11px;
+      color:#e5e7eb;
+      margin-top:4px;
+    }
+
+    .grid-2{
+      display:flex;
+      gap:10px;
+      margin-bottom:6px;
+    }
+    .col{ flex:1; }
+
+    .block{
+      border-radius:10px;
+      padding:8px 10px;
+      margin-top:8px;
+      border:1px solid #e5e7eb;
+      background:#f9fafb;
+    }
+    .block-title{
+      font-size:11px;
+      font-weight:700;
+      text-transform:uppercase;
+      letter-spacing:.12em;
+      color:#0f172a;
+      margin-bottom:4px;
+      border-left:3px solid #f97316;
+      padding-left:6px;
+    }
+    .field-line{
+      font-size:12px;
+      margin:2px 0;
+    }
+    .muted{ color:#6b7280; }
+
+    .items-table{
+      width:100%;
+      border-collapse:collapse;
+      margin-top:4px;
+      background:#ffffff;
+      border-radius:8px;
+      overflow:hidden;
+    }
+    .items-table th,
+    .items-table td{
+      border:1px solid #e5e7eb;
+      padding:4px 6px;
+      text-align:left;
+    }
+    .items-table th{
+      background:#0f172a;
+      color:#e5e7eb;
+      font-size:11px;
+      text-transform:uppercase;
+      letter-spacing:.08em;
+    }
+
+    .obs-box{
+      border-radius:10px;
+      border:1px dashed #cbd5f5;
+      padding:6px 8px;
+      min-height:40px;
+      white-space:pre-wrap;
+      background:#ffffff;
+    }
+
+    .footer{
+      margin-top:38px;
+      display:flex;
+      justify-content:space-between;
+      gap:30px;
+      font-size:11px;
+    }
+    .signature{
+      flex:1;
+      text-align:center;
+    }
+    .signature-line{
+      border-top:1px solid #000;
+      margin-top:34px;
+      padding-top:3px;
+    }
+
+    a{ color:#2563eb; text-decoration:none; }
+    a:hover{ text-decoration:underline; }
+
+    @media print{
+      body{
+        margin:0;
+        padding:0;
+        background:#ffffff;
+      }
+      .page{
+        box-shadow:none;
+        border-radius:0;
+        padding:10mm;
+      }
+    }
+  </style>
+</head>
+<body onload="window.print()">
+  <div class="page">
+    <div class="header">
+      <div class="brand">
+        <div class="brand-logo">
+          <img src="{{ url_for('static', filename='logo.png') }}" alt="Solutec">
+        </div>
+        <div>
+          <div class="brand-title">Solutec Implementos Agrícolas</div>
+          <div class="brand-sub">
+            Revenda: {{ o.reseller_name }}{% if o.cnpj %} · CNPJ: {{ o.cnpj }}{% endif %}<br>
+            Tel: {{ o.reseller_phone or '-' }}
+          </div>
+        </div>
+      </div>
+      <div class="os-id">
+        <div class="os-id-main">OS #{{ o.id }}</div>
+        <div class="os-id-sub">
+          Data do serviço: {{ o.service_date or (o.created_at[:10] if o.created_at) }}
+        </div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="col">
+        <div class="block">
+          <div class="block-title">Dados do cliente</div>
+          <div class="field-line"><strong>Nome:</strong> {{ o.client_name }}</div>
+          <div class="field-line"><strong>CPF:</strong> {{ o.cpf or '-' }}</div>
+          <div class="field-line"><strong>Endereço faturamento:</strong> {{ o.billing_address or '-' }}</div>
+          <div class="field-line"><strong>Endereço entrega:</strong> {{ o.delivery_address or '-' }}</div>
+        </div>
+      </div>
+      <div class="col">
+        <div class="block">
+          <div class="block-title">Dados da máquina</div>
+          {% if o.machine_name %}
+            <div class="field-line"><strong>Máquina:</strong> {{ o.machine_name }}</div>
+            <div class="field-line"><strong>Marca:</strong> {{ o.brand or '-' }}</div>
+            <div class="field-line"><strong>Modelo:</strong> {{ o.model or '-' }}</div>
+            <div class="field-line"><strong>Modelo motor:</strong> {{ o.motor_model or '-' }}</div>
+            <div class="field-line"><strong>Nº NF:</strong> {{ o.nf_number or '-' }}</div>
+            <div class="field-line"><strong>Nº série:</strong> {{ o.serial_number or '-' }}</div>
+            <div class="field-line"><strong>Nº motor:</strong> {{ o.engine_number or '-' }}</div>
+          {% else %}
+            <div class="field-line muted">Nenhuma máquina específica vinculada à OS.</div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="block">
+      <div class="block-title">Local do atendimento</div>
+      <div class="field-line">
+        <strong>Endereço de atendimento:</strong>
+        {{ o.address or o.delivery_address or o.billing_address or '-' }}
+      </div>
+      {% set maps_base = o.maps_url or o.delivery_location_url %}
+      {% if maps_base %}
+        {% set final_loc = build_maps_url(maps_base) %}
+        {% if final_loc %}
+          <div class="field-line">
+            <strong>Localização (Google Maps):</strong>
+            <a href="{{ final_loc }}" target="_blank">{{ final_loc }}</a>
+          </div>
+        {% endif %}
+      {% else %}
+        <div class="field-line muted">Nenhum link de localização foi informado.</div>
+      {% endif %}
+    </div>
+
+    <div class="block">
+      <div class="block-title">Itens executados</div>
+      {% if items %}
+        <table class="items-table">
+          <thead>
+            <tr>
+              <th style="width:40px;">#</th>
+              <th>Descrição do serviço / item</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for it in items %}
+            <tr>
+              <td>{{ loop.index }}</td>
+              <td>{{ it.item_text }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <div class="field-line muted">Nenhum item detalhado foi cadastrado.</div>
+      {% endif %}
+    </div>
+
+    <div class="block">
+      <div class="block-title">Observações gerais</div>
+      <div class="obs-box">
+        {{ o.obs or '' }}
+      </div>
+    </div>
+
+    <div class="footer">
+      <div class="signature">
+        <div class="signature-line"></div>
+        <div>Assinatura do responsável técnico</div>
+      </div>
+      <div class="signature">
+        <div class="signature-line"></div>
+        <div>Assinatura do cliente</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

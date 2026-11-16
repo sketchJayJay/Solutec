@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Login - Solutec{% endblock %}
+{% block body %}
+<div class="login-wrapper">
+  <div class="login-card">
+    <div class="login-header">
+      <div class="login-title">Acessar painel Solutec</div>
+      <div class="login-sub">
+        Escolha se você é <strong>matriz</strong> ou <strong>revendedor</strong> e entre com seu e-mail e senha.
+      </div>
+    </div>
+<div>
+        <strong>Revendedor</strong><br>
+        Use o e-mail e a senha criados no seu cadastro de revenda.
+      </div>
+    </div>
+
+    <form method="post" class="login-form">
+      <label>E-mail
+        <input type="email" name="email" required placeholder="seuemail@revenda.com">
+      </label>
+      <label>Senha
+        <input type="password" name="password" required placeholder="••••••••">
+      </label>
+      <button class="btn primary" type="submit">Entrar</button>
+      <div class="login-hint">
+        Ainda não é revendedor?
+        <a href="{{ url_for('revenda_signup') }}">Clique aqui para se cadastrar.</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

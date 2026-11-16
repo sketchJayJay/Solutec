@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}Cadastro de revenda - Solutec{% endblock %}
+{% block body %}
+<div class="card">
+  <div class="section-header">
+    <div>
+      <div class="section-title">Quero ser revendedor Solutec</div>
+      <div class="section-sub">
+        Preencha os dados da sua empresa e defina o e-mail e a senha que serão usados para acessar o sistema.
+      </div>
+    </div>
+  </div>
+
+  <form method="post" class="grid2">
+    <div>
+      <label>Razão social da revenda *</label>
+      <input name="razao_social" required>
+    </div>
+    <div>
+      <label>Nome fantasia</label>
+      <input name="fantasy_name">
+    </div>
+    <div>
+      <label>CNPJ</label>
+      <input name="cnpj">
+    </div>
+    <div>
+      <label>Inscrição estadual</label>
+      <input name="inscr_social">
+    </div>
+    <div>
+      <label>Responsável</label>
+      <input name="responsavel">
+    </div>
+    <div>
+      <label>Telefone</label>
+      <input name="phone" placeholder="(00) 00000-0000">
+    </div>
+    <div>
+      <label>E-mail da empresa</label>
+      <input name="email" type="email">
+    </div>
+    <div>
+      <label>Rua / Avenida</label>
+      <input name="address_street">
+    </div>
+    <div>
+      <label>Número</label>
+      <input name="address_number">
+    </div>
+    <div>
+      <label>Cidade</label>
+      <input name="address_city">
+    </div>
+    <div>
+      <label>UF</label>
+      <input name="address_state" maxlength="2" style="text-transform:uppercase">
+    </div>
+    <div>
+      <label>CEP</label>
+      <input name="address_zip">
+    </div>
+
+    <div style="grid-column:1/-1; margin-top:10px;">
+      <div class="section-sub" style="margin-bottom:6px;">Dados de acesso do revendedor</div>
+    </div>
+
+    <div>
+      <label>E-mail de login *</label>
+      <input name="login_email" type="email" required placeholder="seuemail@revenda.com">
+    </div>
+    <div>
+      <label>Senha *</label>
+      <input name="login_password" type="password" required placeholder="defina uma senha">
+    </div>
+
+    <div style="grid-column:1/-1; margin-top:10px;">
+      <button class="btn primary" type="submit">Criar cadastro de revenda</button>
+      <a class="btn" href="{{ url_for('login') }}">Já sou revendedor, voltar para o login</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

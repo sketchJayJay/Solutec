@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block title %}OS #{{ o.id }} - {{ o.client_name }} - Solutec{% endblock %}
+{% block body %}
+<div class="card">
+  <div class="section-header">
+    <div>
+      <div class="section-title">Ordem de Serviço #{{ o.id }}</div>
+      <div class="section-sub">
+        Cliente: <strong>{{ o.client_name }}</strong>
+        {% if o.machine_name %}
+          · Máquina: <strong>{{ o.machine_name }}</strong>
+        {% endif %}
+        · Data: {{ o.service_date or o.created_at[:10] }}
+      </div>
+    </div>
+    <div class="section-actions">
+      <a href="{{ url_for('service_order_print', order_id=o.id) }}" class="btn" target="_blank">Versão para impressão</a>
+      <a href="{{ url_for('client_panel', client_id=o.client_id) }}" class="btn">Voltar para o cliente</a>
+    </div>
+  </div>
+
+  <div class="grid2" style="margin-top:14px;">
+    <div>
+      <h3 class="field-title">Dados do cliente</h3>
+      <p class="field-line"><strong>Nome:</strong> {{ o.client_name }}</p>
+      <p class="field-line"><strong>CPF:</strong> {{ o.cpf or '-' }}</p>
+      <p class="field-line"><strong>Endereço faturamento:</strong> {{ o.billing_address or '-' }}</p>
+      <p class="field-line"><strong>Endereço entrega:</strong> {{ o.delivery_address or '-' }}</p>
+    </div>
+    <div>
+      <h3 class="field-title">Dados da máquina</h3>
+      {% if o.machine_name %}
+        <p class="field-line"><strong>Máquina:</strong> {{ o.machine_name }}</p>
+        {% if o.machine_id %}
+          <p class="field-line">
+            <a href="{{ url_for('machine_detail', machine_id=o.machine_id) }}" class="btn">
+              Ver ficha completa da máquina
+            </a>
+          </p>
+        {% endif %}
+      {% else %}
+        <p class="field-line muted">Nenhuma máquina vinculada a esta OS.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <hr class="divider" style="margin:16px 0; border-color:rgba(148,163,184,.5);">
+
+  <div class="grid2">
+    <div>
+      <h3 class="field-title">Local do atendimento</h3>
+      <p class="field-line">
+        <strong>Endereço de atendimento:</strong>
+        {{ o.address or o.delivery_address or o.billing_address or '-' }}
+      </p>
+
+      {% set maps_base = o.maps_url or o.delivery_location_url %}
+      {% if maps_base %}
+        {% set final_loc = build_maps_url(maps_base) %}
+        {% if final_loc %}
+          <p class="field-line">
+            <strong>Localização (Google Maps):</strong>
+            <a href="{{ final_loc }}" target="_blank">{{ final_loc }}</a>
+          </p>
+          {% set wa_text = 'Localização da OS #' ~ o.id ~ ' - ' ~ o.client_name ~ ': ' ~ final_loc %}
+          <p class="field-line">
+            <a href="https://wa.me/?text={{ wa_text|urlencode }}" target="_blank" class="btn">
+              📲 Enviar localização no WhatsApp
+            </a>
+            <span class="muted" style="display:block;margin-top:2px;">
+              Clicou, abre o WhatsApp e você escolhe o contato.
+            </span>
+          </p>
+        {% else %}
+          <p class="field-line muted">
+            O link de localização informado não pôde ser usado. Confira o endereço ou link salvo.
+          </p>
+        {% endif %}
+      {% else %}
+        <p class="field-line muted">
+          Nenhuma localização configurada ainda. Depois de salvar um link de localização no cliente ou na OS,
+          o botão de WhatsApp aparece aqui.
+        </p>
+      {% endif %}
+    </div>
+
+    <div>
+      <h3 class="field-title">Itens executados</h3>
+      {% if items %}
+        <table class="table">
+          <thead>
+            <tr>
+              <th style="width:50px;">#</th>
+              <th>Descrição do serviço / item</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for it in items %}
+            <tr>
+              <td>{{ loop.index }}</td>
+              <td>{{ it.item_text }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}
+        <p class="field-line muted">Nenhum item detalhado cadastrado para esta OS.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <div style="margin-top:16px;">
+    <h3 class="field-title">Observações gerais</h3>
+    <p class="field-line">
+      {% if o.obs %}
+        {{ o.obs }}
+      {% else %}
+        <span class="muted">Nenhuma observação adicional.</span>
+      {% endif %}
+    </p>
+  </div>
+</div>
+{% endblock %}

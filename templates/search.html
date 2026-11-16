@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Consulta - Solutec{% endblock %}
+{% block body %}
+<div class="card">
+  <div class="section-header">
+    <div>
+      <div class="section-title">Consulta avançada</div>
+      <div class="section-sub">
+        Busque por: nome do cliente, CPF, nº de série, nº motor, NF, cidade, fazenda, revenda, CNPJ...
+      </div>
+    </div>
+  </div>
+
+  <form action="{{ url_for('search') }}" method="get" class="search-bar" style="margin-top:0;">
+    <input type="text" name="q" value="{{ q }}" placeholder="Digite sua pesquisa..." required>
+    <button type="submit">Buscar</button>
+  </form>
+
+  {% if q %}
+    <p class="muted" style="margin-top:8px;">Exibindo resultados para: <strong>{{ q }}</strong></p>
+  {% endif %}
+
+  {% if rows %}
+  <table class="table" style="margin-top:12px;">
+    <thead>
+      <tr>
+        <th>Máquina</th>
+        <th>Cliente</th>
+        <th>CPF</th>
+        <th>NF</th>
+        <th>Série</th>
+        <th>Motor</th>
+        <th>Entrega</th>
+        <th>Revenda</th>
+        <th>CNPJ revenda</th>
+        <th>Cidade revenda</th>
+        <th></th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}
+      <tr>
+        <td>{{ r.machine_name }}</td>
+        <td>{{ r.client_name }}</td>
+        <td>{{ r.cpf or '-' }}</td>
+        <td>{{ r.nf_number or '-' }}</td>
+        <td>{{ r.serial_number or '-' }}</td>
+        <td>{{ r.engine_number or '-' }}</td>
+        <td>{{ r.delivery_date or '-' }}</td>
+        <td>{{ r.reseller_name }}</td>
+        <td>{{ r.reseller_cnpj or '-' }}</td>
+        <td>{{ r.reseller_city or '-' }}</td>
+        <td><a class="btn" href="{{ url_for('machine_detail', machine_id=r.id) }}">Abrir</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% elif q %}
+    <p class="muted" style="margin-top:12px;">Nenhum resultado encontrado.</p>
+  {% endif %}
+</div>
+{% endblock %}

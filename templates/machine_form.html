@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% block title %}{% if machine is defined %}Editar máquina - Solutec{% else %}Nova máquina - Solutec{% endif %}{% endblock %}
+{% block body %}
+<div class="card">
+  <div class="section-title">
+    {% if machine is defined %}Editar máquina{% else %}Cadastro de máquina{% endif %}
+  </div>
+  <div class="section-sub">Dados da máquina, motor, NF e entrega.</div>
+
+  <form method="post" class="grid2">
+    <div>
+      <label>Cliente</label>
+      <select name="client_id" required>
+        <option value="">Selecione...</option>
+        {% for c in clients %}
+          <option value="{{ c.id }}"
+                  {% if machine is defined and machine.client_id == c.id %}
+                    selected
+                  {% elif machine is not defined and pref_client_id and pref_client_id|int == c.id %}
+                    selected
+                  {% endif %}>
+            {{ c.reseller_name }} - {{ c.name }}
+          </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div>
+      <label>Nome da máquina</label>
+      <input name="name" required value="{{ machine.name if machine is defined else '' }}">
+    </div>
+
+    <div>
+      <label>Marca</label>
+      <input name="brand" value="{{ machine.brand if machine is defined else '' }}">
+    </div>
+
+    <div>
+      <label>Modelo</label>
+      <input name="model" value="{{ machine.model if machine is defined else '' }}">
+    </div>
+
+    <div>
+      <label>Modelo do motor</label>
+      <input name="motor_model" value="{{ machine.motor_model if machine is defined else '' }}">
+    </div>
+
+    <div>
+      <label>Nº da NF</label>
+      <input name="nf_number" value="{{ machine.nf_number if machine is defined else '' }}">
+    </div>
+
+    <div>
+      <label>Nº de série</label>
+      <input name="serial_number" value="{{ machine.serial_number if machine is defined else '' }}">
+    </div>
+
+    <div>
+      <label>Nº do motor</label>
+      <input name="engine_number" value="{{ machine.engine_number if machine is defined else '' }}">
+    </div>
+
+    <div>
+      <label>Data de entrega</label>
+      <input type="date" name="delivery_date"
+             value="{{ machine.delivery_date if machine is defined else '' }}">
+    </div>
+
+    <div>
+      <label>Horímetro inicial</label>
+      <input type="number" step="0.1" name="initial_hours"
+             value="{{ machine.initial_hours if machine is defined else '' }}">
+    </div>
+
+    <div style="grid-column:1/-1; margin-top:8px;">
+      <button class="btn primary">
+        {% if machine is defined %}Salvar alterações{% else %}Salvar máquina{% endif %}
+      </button>
+      <a href="{{ url_for('machines_list') }}" class="btn">Cancelar</a>
+    </div>
+  </form>
+</div>
+{% endblock %}
