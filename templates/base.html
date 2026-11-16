@@ -23,7 +23,8 @@
   <nav class="side-nav">
     <a href="{{ url_for('dashboard') }}" {% if request.endpoint=='dashboard' %}class="active" aria-current="page"{% endif %}>{{ icon('dashboard') }}Visão geral</a>
     <a href="{{ url_for('machines_list') }}" {% if (request.endpoint or '').startswith('machine') or request.endpoint=='search' %}class="active" aria-current="page"{% endif %}>{{ icon('machine') }}Máquinas</a>
-    <a href="{{ url_for('clients_list') }}" {% if (request.endpoint or '').startswith('client') or (request.endpoint or '').startswith('service_order') %}class="active" aria-current="page"{% endif %}>{{ icon('users') }}Clientes e serviços</a>
+    <a href="{{ url_for('clients_list') }}" {% if (request.endpoint or '').startswith('client') %}class="active" aria-current="page"{% endif %}>{{ icon('users') }}Clientes</a>
+    <a href="{{ url_for('service_orders_list') }}" {% if (request.endpoint or '').startswith('service_order') %}class="active" aria-current="page"{% endif %}>{{ icon('file') }}Ordens de serviço</a>
     {% if g.user.role=='admin' %}<a href="{{ url_for('resellers') }}" {% if request.endpoint=='resellers' %}class="active" aria-current="page"{% endif %}>{{ icon('store') }}Revendas</a>{% endif %}
   </nav>
   {% if g.user.role=='admin' %}
@@ -34,6 +35,7 @@
 </aside>
 <div class="app-shell">
   <header class="topbar"><div class="topbar-left"><button type="button" class="menu-toggle icon-button" aria-label="Abrir menu" aria-expanded="false" aria-controls="navigation">{{ icon('menu') }}</button><span class="topbar-title">Central de operações <span>/</span> <strong>Solutec</strong></span></div><div class="topbar-right"><form action="{{ url_for('machines_list') }}" method="get" class="global-search">{{ icon('search') }}<input aria-label="Busca rápida" name="q" placeholder="Buscar no sistema..."><kbd>/</kbd></form><span class="today-chip">{{ icon('clock') }}{{ today|brdate }}</span><button type="button" class="theme-toggle" data-theme-toggle aria-label="Ativar tema claro" title="Alternar tema"><span class="theme-sun">{{ icon('sun') }}</span><span class="theme-moon">{{ icon('moon') }}</span><span class="theme-label">Tema claro</span></button></div></header>
+  <div class="company-strip" aria-label="Identificação da Solutec"><strong>{{ company.name }}</strong><div><span>CNPJ {{ company.cnpj }}</span><a href="{{ company.phone_href or '#' }}">{{ icon('phone') }}{{ company.phone }}</a></div></div>
 {% else %}<div class="public-shell">{% endif %}
 <main class="content" id="main">
   {% with messages=get_flashed_messages(with_categories=true) %}{% for category,message in messages %}<div class="flash {{ category }}" role="status">{{ icon('check' if category=='success' else 'alert') }}<span>{{ message }}</span></div>{% endfor %}{% endwith %}
@@ -41,7 +43,7 @@
 </main>
 {% if g.user %}
 <footer class="app-footer"><span>Solutec · Gestão de máquinas e revendas</span><span>Organização que acompanha seu trabalho.</span></footer>
-<nav class="mobile-nav" aria-label="Atalhos do celular"><a href="{{ url_for('dashboard') }}" class="{{ 'active' if request.endpoint=='dashboard' else '' }}">{{ icon('dashboard') }}Painel</a><a href="{{ url_for('machines_list') }}" class="{{ 'active' if (request.endpoint or '').startswith('machine') else '' }}">{{ icon('machine') }}Máquinas</a><a href="{{ url_for('clients_list') }}" class="{{ 'active' if (request.endpoint or '').startswith('client') else '' }}">{{ icon('users') }}Clientes</a><a href="{{ url_for('machine_new') }}">{{ icon('plus') }}Cadastrar</a></nav>
+<nav class="mobile-nav" aria-label="Atalhos do celular"><a href="{{ url_for('dashboard') }}" class="{{ 'active' if request.endpoint=='dashboard' else '' }}">{{ icon('dashboard') }}Painel</a><a href="{{ url_for('machines_list') }}" class="{{ 'active' if (request.endpoint or '').startswith('machine') else '' }}">{{ icon('machine') }}Máquinas</a><a href="{{ url_for('clients_list') }}" class="{{ 'active' if (request.endpoint or '').startswith('client') else '' }}">{{ icon('users') }}Clientes</a><a href="{{ url_for('service_orders_list') }}" class="{{ 'active' if (request.endpoint or '').startswith('service_order') else '' }}">{{ icon('file') }}OS</a><a href="{{ url_for('machine_new') }}">{{ icon('plus') }}Cadastrar</a></nav>
 {% endif %}
 </div>
 </body>

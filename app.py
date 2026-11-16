@@ -6,6 +6,11 @@ import secrets, hmac, math, uuid, tempfile, zipfile, json
 from pathlib import Path
 from maintenance import audit, machine_rows, normalized, search_text, attachment_path, snapshot
 
+COMPANY_NAME = 'Solutec Implementos Agrícolas'
+COMPANY_CNPJ = '45.154.368/0001-42'
+COMPANY_PHONE = '(32) 9 9988-5977'
+COMPANY_MIGRATION = '2026-11-16-company-identity-v1'
+
 BASEDIR = os.path.abspath(os.path.dirname(__file__))
 DATA_DIR = os.environ.get("SOLUTEC_DATA_DIR", os.path.join(BASEDIR, "data"))
 os.makedirs(DATA_DIR, exist_ok=True)
@@ -123,8 +128,10 @@ def init_db():
     if os.path.isfile(DB_PATH):
         probe = sqlite3.connect(DB_PATH)
         columns = {r[1] for r in probe.execute("PRAGMA table_info(machines)")}
+        has_migrations = probe.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='schema_migrations'").fetchone()
+        company_pending = not has_migrations or not probe.execute('SELECT 1 FROM schema_migrations WHERE name=?',(COMPANY_MIGRATION,)).fetchone()
         probe.close()
-        if columns and not {"obs", "archived_at", "archive_reason"}.issubset(columns):
+        if columns and (company_pending or not {"obs", "archived_at", "archive_reason"}.issubset(columns)):
             snapshot(DB_PATH, os.path.join(DATA_DIR, "backups"), "antes-atualizacao")
     con = connect()
     cur = con.cursor()
@@ -234,6 +241,9 @@ def init_db():
     if "obs_text" in columns:
         cur.execute("UPDATE machines SET obs=obs_text WHERE obs IS NULL AND obs_text IS NOT NULL")
     cur.executescript("""
+        CREATE TABLE IF NOT EXISTS schema_migrations(
+            name TEXT PRIMARY KEY, applied_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
         CREATE TABLE IF NOT EXISTS maintenance_events(
             id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER,
             action TEXT NOT NULL, record_id INTEGER, details TEXT,
@@ -243,6 +253,8 @@ def init_db():
         CREATE INDEX IF NOT EXISTS idx_machines_reseller ON machines(reseller_id);
         CREATE INDEX IF NOT EXISTS idx_clients_reseller ON clients(reseller_id);
         CREATE INDEX IF NOT EXISTS idx_orders_client ON service_orders(client_id);
+        CREATE INDEX IF NOT EXISTS idx_orders_reseller ON service_orders(reseller_id);
+        CREATE INDEX IF NOT EXISTS idx_order_items_order ON service_items(order_id);
         CREATE INDEX IF NOT EXISTS idx_photos_machine ON machine_photos(machine_id);
     """)
 
@@ -283,6 +295,12 @@ def init_db():
             "Rua Exemplo", "100", "Cidade", "UF", "00000-000"
         ))
         matriz_id = cur.lastrowid
+
+    # Atualiza somente a identificação institucional da matriz, uma única vez.
+    # A cópia anterior é guardada no início de init_db antes de qualquer escrita.
+    if not cur.execute('SELECT 1 FROM schema_migrations WHERE name=?',(COMPANY_MIGRATION,)).fetchone():
+        cur.execute('UPDATE resellers SET cnpj=?, phone=? WHERE id=?',(COMPANY_CNPJ,COMPANY_PHONE,matriz_id))
+        cur.execute('INSERT INTO schema_migrations(name) VALUES (?)',(COMPANY_MIGRATION,))
 
     # Admin da matriz (vê tudo)
     cur.execute("SELECT id FROM users WHERE reseller_id = ? AND role = 'admin'", (matriz_id,))
@@ -805,6 +823,64 @@ def client_os_new(client_id):
     return redirect(url_for('service_order_detail',order_id=order_id))
 
 
+@app.route('/os')
+@login_required
+def service_orders_list():
+    q=request.args.get('q','').strip()
+    status=request.args.get('status','all')
+    if status not in ('all','review'): status='all'
+    date_from=request.args.get('date_from','').strip()
+    date_to=request.args.get('date_to','').strip()
+    filter_error=None
+    for value in (date_from,date_to):
+        if value:
+            try:
+                if not re.fullmatch(r'[0-9]{4}-[0-9]{2}-[0-9]{2}',value): raise ValueError
+                datetime.date.fromisoformat(value)
+            except ValueError: filter_error='Informe datas válidas no filtro de período.'
+    if not filter_error and date_from and date_to and date_from>date_to:
+        filter_error='A data inicial deve ser anterior ou igual à data final.'
+    joins="""FROM service_orders o
+        LEFT JOIN clients c ON c.id=o.client_id AND c.reseller_id=o.reseller_id
+        LEFT JOIN machines m ON m.id=o.machine_id AND m.reseller_id=o.reseller_id
+        LEFT JOIN resellers r ON r.id=o.reseller_id"""
+    review="(c.id IS NULL OR (o.machine_id IS NOT NULL AND (m.id IS NULL OR m.client_id!=o.client_id)))"
+    effective_date="COALESCE(NULLIF(o.service_date,''),substr(o.created_at,1,10))"
+    clauses=[];params=[]
+    if scope_id() is not None:
+        clauses.append('o.reseller_id=?');params.append(scope_id())
+    scope_where=' WHERE '+' AND '.join(clauses) if clauses else ''
+    con=connect()
+    totals=con.execute('SELECT COUNT(*) total,COALESCE(SUM(CASE WHEN '+review+' THEN 1 ELSE 0 END),0) review '+joins+scope_where,params).fetchone()
+    if q:
+        like='%'+search_text(q)+'%'
+        fields=('c.name','c.cpf','m.name','m.serial_number','m.engine_number','o.address','o.obs')
+        parts=['fold('+field+') LIKE ?' for field in fields]
+        params.extend([like]*len(fields))
+        parts.append('EXISTS(SELECT 1 FROM service_items si WHERE si.order_id=o.id AND fold(si.item_text) LIKE ?)')
+        params.append(like)
+        match=re.fullmatch(r'(?:OS\s*#?\s*|#\s*)?([0-9]+)',q,re.IGNORECASE)
+        if match and len(match[1].lstrip('0'))<=18:
+            parts.append('o.id=?');params.append(int(match[1]))
+        clauses.append('('+' OR '.join(parts)+')')
+    if status=='review': clauses.append(review)
+    if not filter_error:
+        if date_from:clauses.append(effective_date+'>=?');params.append(date_from)
+        if date_to:clauses.append(effective_date+'<=?');params.append(date_to)
+    else:
+        clauses.append('0=1')
+        flash(filter_error,'error')
+    where=' WHERE '+' AND '.join(clauses) if clauses else ''
+    count=con.execute('SELECT COUNT(*) '+joins+where,params).fetchone()[0]
+    pages=max(1,(count+24)//25)
+    page=max(1,min(request.args.get('page',1,type=int),pages))
+    rows=con.execute('SELECT o.*,c.name AS client_name,m.name AS machine_name,m.serial_number,r.razao_social AS reseller_name,\n        {effective_date} AS display_date,CASE WHEN {review} THEN 1 ELSE 0 END AS needs_review,\n        (SELECT COUNT(*) FROM service_items si WHERE si.order_id=o.id) AS item_count,\n        (SELECT item_text FROM service_items si WHERE si.order_id=o.id ORDER BY si.id LIMIT 1) AS first_item\n        '.format(effective_date=effective_date,review=review)+joins+where+
+        ' ORDER BY '+effective_date+' DESC,o.id DESC LIMIT 25 OFFSET ?',params+[(page-1)*25]).fetchall()
+    con.close()
+    return render_template('service_orders_list.html',rows=rows,q=q,status=status,date_from=date_from,date_to=date_to,
+        counts={'all':totals['total'],'review':totals['review']},total_found=count,page=page,pages=pages),400 if filter_error else 200
+
+
 @app.route("/os/<int:order_id>")
 @login_required
 def service_order_detail(order_id):
@@ -867,7 +943,20 @@ def csrf_token():
 
 @app.context_processor
 def interface_helpers():
-    return {'csrf_token':csrf_token, 'today':datetime.date.today(), 'app_version':'3.0'}
+    if not hasattr(g,'company_profile'):
+        profile={'name':COMPANY_NAME,'cnpj':COMPANY_CNPJ,'phone':COMPANY_PHONE}
+        con=connect()
+        try:
+            row=con.execute("SELECT cnpj,phone FROM resellers WHERE razao_social=? ORDER BY id LIMIT 1",('Solutec Matriz',)).fetchone()
+            if row:
+                profile['cnpj']=row['cnpj'] or COMPANY_CNPJ
+                profile['phone']=row['phone'] or COMPANY_PHONE
+        finally:
+            con.close()
+        phone=normalize_phone(profile['phone'])
+        profile['phone_href']='tel:+'+phone if phone else None
+        g.company_profile=profile
+    return {'csrf_token':csrf_token,'today':datetime.date.today(),'app_version':'3.1','company':g.company_profile}
 
 
 @app.template_filter('brdate')

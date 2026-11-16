@@ -108,7 +108,7 @@
 
   <hr class="divider">
 
-  <h3 class="section-title" style="margin-bottom:6px;">Nova OS rápida</h3>
+  <h3 id="nova-os" class="section-title" style="margin-bottom:6px;">Nova OS rápida</h3>
   <div class="section-sub" style="margin-bottom:10px;">Descreva item por item o que foi feito e gere a OS para impressão.</div>
 
   <form method="post" action="{{ url_for('client_os_new', client_id=client.id) }}" id="os-form"><input type="hidden" name="_csrf" value="{{ csrf_token() }}">

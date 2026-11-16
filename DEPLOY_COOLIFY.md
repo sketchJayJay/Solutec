@@ -1,4 +1,4 @@
-# Solutec 3.0 no Coolify
+# Solutec 3.1 no Coolify
 
 ## Escolha do pacote
 
@@ -74,3 +74,9 @@ Abra `http://127.0.0.1:8000`. Se estiver usando o pacote sem banco, defina tamb�
 O menu **Baixar backup completo** exporta SQLite por sua API de backup, incluindo as páginas que ainda estejam no WAL, junto com os anexos. Não copie apenas o arquivo `.db` enquanto a aplicação estiver escrevendo.
 
 Para restaurar, pare a aplicação, preserve uma cópia do volume atual e restaure `solutec.db` e `uploads/` no mesmo volume. Preserve a chave de sessão. Uma restauração substitui a base inteira; para corrigir um cadastro isolado, use as telas de edição e conferência.
+
+## Atualização 3.1
+
+Ao iniciar esta versão, a identificação da Solutec Matriz é atualizada para CNPJ `45.154.368/0001-42` e telefone `(32) 9 9988-5977`. A alteração é registrada uma única vez, com cópia anterior do banco. Ela não altera a identificação das outras revendas, senhas, clientes, máquinas ou OS.
+
+A aba **Ordens de serviço** está disponível no menu lateral e no atalho **OS** do celular. Não há variável nova de ambiente para esta atualização.

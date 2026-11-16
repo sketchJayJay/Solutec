@@ -1,3 +1,12 @@
+# Solutec 3.1 - ordens de serviço e identificação
+
+- Aba exclusiva de OS no menu do computador e do celular.
+- Histórico com busca por número da OS, cliente, máquina, série, motor e descrição do serviço; filtro por período e paginação.
+- Acesso às OS antigas, inclusive registros com vínculo pendente, com atalhos para abrir e imprimir/PDF.
+- Cadastro rápido de OS pelo fluxo de escolha do cliente.
+- CNPJ 45.154.368/0001-42 e telefone (32) 9 9988-5977 nos cabeçalhos do sistema, das OS e das fichas de máquinas.
+- Atualização institucional da matriz aplicada uma vez, com cópia anterior do banco; revendas e registros de clientes preservados.
+
 # Solutec 3.0 - visual renovado
 
 - Nova identidade em azul profundo e laranja, com tema escuro e opção de tema claro.

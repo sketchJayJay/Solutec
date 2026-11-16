@@ -180,11 +180,7 @@
           <img src="{{ url_for('static', filename='logo-brand.png') }}" alt="Solutec">
         </div>
         <div>
-          <div class="brand-title">Solutec Implementos Agrícolas</div>
-          <div class="brand-sub">
-            Revenda: {{ o.reseller_name }}{% if o.cnpj %} · CNPJ: {{ o.cnpj }}{% endif %}<br>
-            Tel: {{ o.reseller_phone or '-' }}
-          </div>
+          {% set issuer_reseller=o.reseller_name %}{% include 'company_print_header.html' %}
         </div>
       </div>
       <div class="os-id">

@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+{% block title %}Ordens de serviço · Solutec{% endblock %}
+{% block body %}
+<div class="page-header"><div><div class="eyebrow">ASSISTÊNCIA SOLUTEC</div><h1>Ordens de serviço<span class="title-dot">.</span></h1><p>Todas as OS geradas, com cliente, equipamento e histórico do atendimento.</p></div><a class="btn primary" href="{{ url_for('clients_list',for_os='1') }}">{{ icon('plus') }}Nova OS</a></div>
+<section class="card orders-toolbar">
+  <div class="section-header"><div><h2>Histórico de atendimentos</h2><p class="section-sub">Pesquise pelo número da OS, cliente, máquina, série ou serviço.</p></div><span class="result-count">{{ total_found }} OS encontrada{{ 's' if total_found!=1 else '' }}</span></div>
+  <form method="get" action="{{ url_for('service_orders_list') }}" class="orders-filters">
+    <div><input type="hidden" name="status" value="{{ status }}"><label for="orders-query">Buscar OS</label><div class="orders-query">{{ icon('search') }}<input id="orders-query" name="q" value="{{ q }}" placeholder="Ex.: OS #6, cliente ou troca de óleo"></div></div>
+    <div><label for="date-from">De</label><input id="date-from" type="date" name="date_from" value="{{ date_from }}"></div>
+    <div><label for="date-to">Até</label><input id="date-to" type="date" name="date_to" value="{{ date_to }}"></div>
+    <div class="orders-filter-actions"><button type="submit" class="btn primary">Buscar</button><a class="btn" href="{{ url_for('service_orders_list') }}">Limpar</a></div>
+  </form>
+  <nav class="tabs orders-tabs" aria-label="Filtrar ordens de serviço"><a class="{{ 'active' if status=='all' else '' }}" href="{{ url_for('service_orders_list',q=q,date_from=date_from,date_to=date_to,status='all') }}">Todas as OS<span>{{ counts.all }}</span></a><a class="{{ 'active' if status=='review' else '' }}" href="{{ url_for('service_orders_list',q=q,date_from=date_from,date_to=date_to,status='review') }}">Vínculo a conferir<span>{{ counts.review }}</span></a></nav>
+</section>
+<section class="card orders-history">
+{% if rows %}
+<table class="table orders-table"><thead><tr><th>Ordem de serviço</th><th>Cliente / equipamento</th><th>Serviços e observações</th><th>Data</th><th></th></tr></thead><tbody>
+{% for o in rows %}<tr>
+  <td data-label="OS"><a class="record-title" href="{{ url_for('service_order_detail',order_id=o.id) }}"><span class="mini-machine">{{ icon('file') }}</span><span><strong>OS #{{ o.id }}</strong><small>{{ o.reseller_name or 'Revenda não encontrada' }}</small></span></a>{% if o.needs_review %}<span class="badge warn orders-review">{{ icon('alert') }}Conferir vínculo</span>{% endif %}</td>
+  <td data-label="Cliente / equipamento"><div><strong>{{ o.client_name or 'Cliente não encontrado' }}</strong><div class="orders-machine">{{ o.machine_name or 'Sem máquina vinculada' }}</div>{% if o.serial_number %}<span class="serial-chip">Série {{ o.serial_number }}</span>{% endif %}</div></td>
+  <td data-label="Serviços"><div class="order-summary">{{ (o.first_item or o.obs or 'Sem descrição de serviço')|truncate(110,True,'…') }}{% if o.item_count %}<small>{{ o.item_count }} item{{ 's' if o.item_count!=1 else '' }} registrado{{ 's' if o.item_count!=1 else '' }}</small>{% endif %}</div></td>
+  <td data-label="Data">{{ o.display_date|brdate }}</td>
+  <td data-label="Ações"><div class="orders-row-actions"><a class="btn btn-sm" href="{{ url_for('service_order_detail',order_id=o.id) }}">Ver OS {{ icon('arrow') }}</a><a class="btn btn-sm" href="{{ url_for('service_order_print',order_id=o.id) }}" target="_blank" rel="noopener">Imprimir / PDF</a></div></td>
+</tr>{% endfor %}
+</tbody></table>
+{% if pages>1 %}<nav class="orders-pagination" aria-label="Páginas de ordens de serviço"><span>Página {{ page }} de {{ pages }}</span><div>{% if page>1 %}<a class="btn btn-sm" href="{{ url_for('service_orders_list',q=q,status=status,date_from=date_from,date_to=date_to,page=page-1) }}">Anterior</a>{% endif %}{% if page<pages %}<a class="btn btn-sm" href="{{ url_for('service_orders_list',q=q,status=status,date_from=date_from,date_to=date_to,page=page+1) }}">Próxima {{ icon('arrow') }}</a>{% endif %}</div></nav>{% endif %}
+{% else %}<div class="empty-state">{{ icon('file') }}<h3>Nenhuma OS encontrada</h3><p>Ajuste os filtros ou selecione um cliente para registrar uma nova ordem de serviço.</p><a class="btn" href="{{ url_for('clients_list',for_os='1') }}">Registrar OS</a></div>{% endif %}
+</section>
+{% endblock %}

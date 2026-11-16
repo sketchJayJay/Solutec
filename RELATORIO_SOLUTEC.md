@@ -1,5 +1,15 @@
 # Solutec - revisão de 16/11/2026
 
+## Atualização 3.1 - OS e cabeçalhos
+
+Criada a aba exclusiva **Ordens de serviço**, acessível no computador e no celular. Ela lista todas as OS da conta, com busca por número, cliente, equipamento, série, motor e descrição; período, paginação e filtro de vínculos pendentes. As OS antigas continuam visíveis, com acesso ao documento e à impressão/PDF.
+
+O painel agora aponta seu indicador de OS para essa aba. O botão Nova OS leva à escolha do cliente e já abre a área do atendimento no cadastro escolhido.
+
+CNPJ **45.154.368/0001-42** e telefone **(32) 9 9988-5977** adicionados à identificação do sistema e dos cabeçalhos das OS e fichas impressas. A matriz recebe esses dados por migração aplicada uma vez, com cópia anterior do banco. Outras revendas e os dados dos clientes são preservados.
+
+**122 testes automatizados passaram** na versão 3.1, incluindo histórico, pesquisa, período, paginação, isolamento das revendas, cabeçalhos e idempotência da atualização institucional.
+
 ## Revisão visual 3.0
 
 Nova direção visual em azul profundo e laranja, com tema escuro por padrão e opção de tema claro. A escolha fica salva no navegador. O painel ganhou uma imagem ilustrativa, números em destaque, indicadores de vínculo calculados a partir do cadastro real e atalhos redesenhados.
@@ -45,7 +55,7 @@ Há quatro OS com cliente ausente: #1 aponta para o antigo cliente #5; #2, #3 e 
 
 Dois PDFs da máquina #8 estão no disco sem referência na tabela de anexos. Eles foram preservados e seguem no backup completo. Confira se são cópias antigas antes de criar novos vínculos.
 
-Os dados institucionais da matriz usados na impressão ainda contêm campos de exemplo (CNPJ e telefone). Substitua pelos dados reais antes de emitir documentos oficiais; nenhum dado fiscal foi inventado nesta revisão.
+A identificação da matriz foi atualizada na versão 3.1 com o CNPJ e o telefone fornecidos pelo usuário. Nenhum dado institucional das outras revendas foi substituído.
 
 ## Correções e melhorias entregues
 
@@ -74,7 +84,7 @@ Os dados institucionais da matriz usados na impressão ainda contêm campos de e
 
 ## Validação
 
-**94 testes automatizados passaram**, sem falhas. Cobrem páginas existentes, busca, cadastro/edição, valores inválidos, duplicidade, observações, upload/PDF, remoção de anexos, OS, isolamento das revendas, sessão, formulários, backup, arquivamento/restauração, migrações, banco novo, troca de proprietário, QR Code e senha administrativa.
+**122 testes automatizados passaram**, sem falhas. Cobrem páginas existentes, busca, cadastro/edição, valores inválidos, duplicidade, observações, upload/PDF, remoção de anexos, OS, isolamento das revendas, sessão, formulários, backup, arquivamento/restauração, migrações, banco novo, troca de proprietário, QR Code e senha administrativa.
 
 Também foi iniciado o Gunicorn com dois workers e `--preload`: health, login, CSS e JavaScript responderam HTTP 200. A ficha da máquina e a OS usadas na revisão foram renderizadas em A4 com uma página cada.
 

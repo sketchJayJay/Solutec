@@ -25,7 +25,7 @@
   {% for label,value,sub,kind,icon_name,link in [
     ('Máquinas cadastradas',total_machines,(linked|string) ~ ' com proprietário · ' ~ (report.orphan_machines|length|string) ~ ' a conferir','blue','machine',url_for('machines_list')),
     ('Clientes atendidos',total_clients,'Proprietários e locais de entrega','teal','users',url_for('clients_list')),
-    ('Ordens de serviço',total_orders,'Histórico dos atendimentos','purple','file',url_for('clients_list')),
+    ('Ordens de serviço',total_orders,'Histórico dos atendimentos','purple','file',url_for('service_orders_list')),
     ('Cadastros a conferir',report.review_machines|length,'Vínculos e identificadores repetidos','orange','alert',url_for('machines_list',status='review'))
   ] %}
   <a class="stat-card stat-{{ kind }}" href="{{ link }}">
@@ -38,7 +38,7 @@
 <section class="quick-actions" aria-label="Acesso rápido">
   <a href="{{ url_for('client_new') }}"><span class="quick-symbol teal">{{ icon('users') }}</span><span><small>RELACIONAMENTO</small><strong>Novo cliente</strong></span>{{ icon('plus') }}</a>
   <a href="{{ url_for('machine_new') }}"><span class="quick-symbol blue">{{ icon('machine') }}</span><span><small>INVENTÁRIO</small><strong>Cadastrar máquina</strong></span>{{ icon('plus') }}</a>
-  <a href="{{ url_for('clients_list') }}"><span class="quick-symbol orange">{{ icon('file') }}</span><span><small>ASSISTÊNCIA</small><strong>Registrar atendimento</strong></span>{{ icon('arrow') }}</a>
+  <a href="{{ url_for('clients_list',for_os='1') }}"><span class="quick-symbol orange">{{ icon('file') }}</span><span><small>ASSISTÊNCIA</small><strong>Registrar atendimento</strong></span>{{ icon('arrow') }}</a>
 </section>
 {% if report.orphan_machines %}
 <div class="notice attention-banner"><span class="notice-icon">{{ icon('alert') }}</span><div><strong>{{ report.orphan_machines|length }} máquina sem proprietário identificado</strong><p>O cadastro foi preservado. Confira o cliente e os identificadores antes de fazer qualquer alteração.</p></div><a class="btn" href="{{ url_for('machines_list',status='orphan') }}">Conferir cadastro {{ icon('arrow') }}</a></div>

@@ -15,7 +15,8 @@
     </div>
     <div class="section-actions">
       <a href="{{ url_for('service_order_print', order_id=o.id) }}" class="btn" target="_blank">Versão para impressão</a>
-      <a href="{{ url_for('client_panel', client_id=o.client_id) }}" class="btn">Voltar para o cliente</a>
+      <a href="{{ url_for('service_orders_list') }}" class="btn">Todas as OS</a>
+      {% if o.client_name %}<a href="{{ url_for('client_panel',client_id=o.client_id) }}" class="btn">Abrir cliente</a>{% endif %}
     </div>
   </div>
 
