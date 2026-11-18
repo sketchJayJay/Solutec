@@ -76,7 +76,7 @@ a { color:var(--blue); }
 .btn.btn-danger,button[type=submit].btn.btn-danger { background:var(--danger-bg);border-color:#c5786a42;color:var(--danger-text); }
 .btn-sm { min-height:33px;padding:8px 11px;font-size:10px; }
 .command-hero { isolation:isolate;position:relative;background:#061422;border:1px solid #39577a80;border-radius:21px;overflow:hidden;min-height:355px;box-shadow:0 18px 45px #000c1c22; }
-.command-image { position:absolute;inset:0;background:url('hero-tractor-v3.webp') center 53% / cover no-repeat;z-index:-2; }
+.command-image { position:absolute;inset:0;background:url('solutec/tractor-trailer.webp') center 67% / cover no-repeat;z-index:-2; }
 .command-hero:after { content:'';position:absolute;inset:0;z-index:-1;pointer-events:none;background:linear-gradient(90deg,#071626f2 0%,#071626e0 26%,#0716269a 43%,#0716260a 70%); }
 .command-copy { padding:34px 36px 29px;max-width:65%;position:relative;z-index:1; }
 .command-kicker { display:flex;align-items:center;gap:10px;color:#9bb8d9;letter-spacing:2.5px;font-size:8px;font-weight:650;margin-bottom:17px; }
@@ -186,7 +186,7 @@ input[type=file]::file-selector-button { color:#a3c5fa;background:#3b82e91c;bord
 .is-archived .equipment-visual { filter:saturate(.3); }.is-archived { opacity:.8; }
 .inventory-table { display:none; }[data-equipment-view='list'] .equipment-grid { display:none; }[data-equipment-view='list'] .inventory-table { display:block; }
 .machine-cover { position:relative;isolation:isolate;background:#0e2846;border:1px solid #3f638c6b;border-radius:18px;padding:28px 30px;margin-bottom:20px;overflow:hidden; }
-.machine-cover:before { content:'';position:absolute;inset:0;z-index:-2;background:url('hero-tractor-v3.webp') right 45% / cover no-repeat;opacity:.22; }
+.machine-cover:before { content:'';position:absolute;inset:0;z-index:-2;background:url('solutec/tractor-detail.webp') right 62% / cover no-repeat;opacity:.22; }
 .machine-cover:after { content:'';position:absolute;inset:0;z-index:-1;background:linear-gradient(90deg,#0d2544 30%,#0d254480 75%); }
 .machine-cover .eyebrow { color:#739ac0;font-size:8px;letter-spacing:2px; }.machine-cover h1 { color:#fff;font-size:31px;letter-spacing:-1px;line-height:1.3;max-width:800px; }.machine-cover p { color:#7b9fc4;font-size:11px;margin-top:10px; }
 .machine-id-tag { display:inline-flex;align-items:center;gap:8px;color:#f5b863;border:1px solid #eab35c33;background:#eab35c0a;border-radius:5px;padding:7px 9px;font-size:8px;letter-spacing:1.6px;margin-top:20px; }.machine-id-tag .icon { width:12px;height:12px; }
@@ -204,7 +204,7 @@ input[type=file]::file-selector-button { color:#a3c5fa;background:#3b82e91c;bord
 .public-shell { background:radial-gradient(ellipse at 15% 25%,#1f5fb11f,transparent 55%),var(--bg); }
 .login-layout { background:var(--surface);border-color:var(--line);border-radius:22px;box-shadow:0 35px 100px #020a183b;grid-template-columns:1.1fr 1fr; }
 .login-intro { background:#071727;padding:44px;min-height:580px;position:relative;isolation:isolate;display:flex;flex-direction:column; }
-.login-intro:before { content:'';position:absolute;inset:0;z-index:-2;background:url('hero-tractor-v3.webp') 69% 100% / auto 60% no-repeat;opacity:.9; }
+.login-intro:before { content:'';position:absolute;inset:0;z-index:-2;background:url('solutec/tractor-loader.webp') 69% 100% / auto 60% no-repeat;opacity:.9; }
 .login-intro:after { content:'';position:absolute;inset:0;width:auto;height:auto;z-index:-1;background:linear-gradient(180deg,#071727 25%,#071727b0 49%,#07172700 75%);border:none;box-shadow:none;border-radius:0; }
 .login-intro .brand { margin-bottom:45px; }.login-intro h1 { color:white;font-size:36px;letter-spacing:-1.2px;position:relative;z-index:1;max-width:410px; }.login-intro h1 em { color:#ffb848; }.login-intro p { color:#7898b9;max-width:330px;font-size:11px; }.login-intro .dealer-logo { margin:25px 0 auto;position:relative;z-index:1; }.login-intro .dealer-logo img { width:90px; }
 .login-form-wrap { padding:62px 47px 45px;display:flex;flex-direction:column;justify-content:center; }.login-form-wrap h2 { color:var(--heading);font-size:29px;letter-spacing:-1px; }.login-form-wrap>p { color:var(--muted);font-size:12px; }.login-form-wrap .eyebrow { font-size:8px;color:#6389b2; }.login-help { color:var(--muted); }.login-footer { color:#486583; }
@@ -299,3 +299,40 @@ html[data-theme='light'] .theme-toggle { color:#6c84a0; }
 @media(max-width:1020px){.company-strip{padding-left:22px;padding-right:22px}.company-strip>strong{display:none}.company-strip>div{width:100%;justify-content:space-between}.orders-row-actions{min-width:110px}.orders-table .record-title strong{font-size:12px}}
 @media(max-width:760px){.company-strip{padding:8px 17px;min-height:32px;font-size:8px}.company-strip>div{gap:9px;flex-wrap:wrap}.company-strip .icon{width:10px;height:10px}.company-strip a{gap:5px}.mobile-nav{grid-template-columns:repeat(5,minmax(0,1fr))}.orders-filters{gap:14px 12px}.orders-filters>div{flex:1 1 calc(50% - 6px)}.orders-filters>div:first-child{flex:1 1 100%}.orders-query input{font-size:12px!important}.orders-query>.icon{top:15px}.orders-filters>.orders-filter-actions{flex-basis:100%;justify-content:stretch}.orders-filter-actions>.btn{flex:1;min-height:42px}.orders-toolbar{padding:22px 18px}.orders-toolbar .section-header{gap:13px}.orders-toolbar .result-count{font-size:10px}.orders-tabs{margin-top:20px;padding-top:17px}.orders-history{padding:17px}.orders-table tr{padding:15px}.orders-table td:first-child{display:block}.orders-table td:nth-child(2)>div{text-align:right}.orders-table .record-title strong{font-size:14px!important}.orders-table .record-title small{font-size:10px!important}.orders-table td:last-child:before{display:none}.orders-row-actions{width:100%;gap:8px}.orders-row-actions>.btn{flex:1;font-size:10px;min-height:36px}.orders-review{font-size:8px}.orders-machine{font-size:10px}.order-summary{max-width:65%;font-size:11px;text-align:right}.order-summary>small{font-size:9px}.orders-pagination{font-size:10px;flex-wrap:wrap}#nova-os{scroll-margin-top:110px}}
 @media print{.company-strip{display:none!important}}
+
+/* Solutec 3.2 — fotografias da empresa, marca própria e exclusão de cadastro. */
+.command-hero{display:flex;min-height:390px;align-items:stretch}
+.command-hero:after{display:none}
+.command-copy{order:0;flex:1 1 49%;max-width:49%;padding:36px 34px;align-self:center}
+.command-image{order:1;position:relative;inset:auto;flex:1 1 51%;z-index:0;min-height:390px;background-image:url('solutec/tractor-trailer.webp');background-position:center 67%;background-size:cover;opacity:1}
+.command-image:after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,#06142270,transparent 25%),linear-gradient(0deg,#06142250,transparent 40%)}
+.command-copy h2{font-size:35px}.hero-corner{z-index:2;top:auto;bottom:21px;color:#fff;text-shadow:0 1px 5px #000}.hero-corner strong{color:#fff}
+.tractor-gallery{display:flex;gap:12px;margin:16px 0 24px}
+.tractor-photo{position:relative;display:block;flex:1 1 0;min-width:0;height:150px;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#10243d}
+.tractor-photo img{display:block;width:100%;height:100%;object-fit:cover;object-position:center 63%;transition:transform .2s}
+.tractor-photo.trailer img{object-position:center 67%}.tractor-photo.yard img{object-position:center 60%}.tractor-photo.loader img{object-position:center 65%}
+.tractor-photo:after{content:'';position:absolute;inset:45% 0 0;background:linear-gradient(transparent,#061422e8)}
+.tractor-photo>span{position:absolute;bottom:12px;left:14px;right:12px;z-index:1;display:flex;justify-content:space-between;gap:5px;align-items:center;color:white;font-size:10px;font-weight:600}
+.tractor-photo .icon{width:14px;height:14px}.tractor-photo:hover img{transform:scale(1.04)}
+.login-intro:before{background-image:url('solutec/tractor-loader.webp');background-size:cover;background-position:center 64%;opacity:.7}
+.login-intro:after{background:linear-gradient(180deg,#071727f9 0%,#071727e8 27%,#07172740 65%,#07172710)}
+.machine-cover:before{background-image:url('solutec/tractor-detail.webp');background-size:cover;background-position:right 62%;opacity:.25}
+.company-logo{display:flex!important;align-items:center;justify-content:center;background:#fff;padding:9px 12px;border-radius:10px;width:100%;min-height:64px}
+.company-logo img{display:block;width:100%;max-width:220px;height:62px;object-fit:contain}.sidebar>.brand:has(.company-logo){margin-left:0;margin-right:0}
+.identity-card{display:flex;margin-bottom:22px;gap:32px;align-items:stretch;max-width:1020px;padding:28px}.identity-preview{flex:0 1 35%;min-width:220px;background:#0b213b;border:1px solid #2d4d72;border-radius:13px;display:flex;flex-direction:column;justify-content:center;padding:28px 23px;gap:24px}
+.identity-preview>.brand{margin:0;gap:10px}.identity-preview>span{color:#6689b1;font-size:8px;letter-spacing:2px;text-align:center}
+.identity-preview .brand strong{font-size:23px}.identity-controls{flex:1;min-width:0}.identity-controls form{margin-top:21px}.identity-controls .btn{margin-top:18px}.identity-controls .remove-logo-form{margin-top:0}.brand-photos .tractor-gallery{margin-bottom:0}
+.delete-machine-card{max-width:900px;padding:30px;border-top:2px solid var(--danger-text)}
+.delete-heading{display:flex;align-items:center;gap:16px}.delete-symbol{display:grid;place-items:center;width:46px;height:46px;background:var(--danger-bg);color:var(--danger-text);border-radius:11px;flex-shrink:0}.delete-symbol .icon{width:23px;height:23px}
+.delete-identifiers{display:flex;gap:24px;flex-wrap:wrap;padding:22px 0;margin:22px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}.delete-identifiers>div{flex:1;min-width:150px}.delete-identifiers dt{font-size:10px;color:var(--muted)}.delete-identifiers dd{font-size:13px;color:var(--ink);margin:8px 0 0;overflow-wrap:anywhere}
+.delete-explanation{font-size:12px;line-height:1.8;color:var(--muted)}.delete-explanation p+p{margin-top:8px}.delete-machine-form{margin-top:25px}.delete-machine-form>div:first-of-type{max-width:300px}.delete-buttons{display:flex;justify-content:flex-end;gap:10px;border-top:1px solid var(--line);padding-top:23px;margin-top:24px}
+html[data-theme='light'] .btn.btn-danger{color:var(--danger-text);background:var(--danger-bg);border-color:#bc62543b}
+@media(max-width:1250px){.command-copy{padding:30px 26px}.command-copy h2{font-size:31px}.command-image{min-height:370px}.command-hero{min-height:370px}.tractor-photo{height:135px}}
+@media(max-width:760px){
+ .command-hero{display:flex;flex-direction:column;min-height:0}.command-copy{flex:auto;width:100%;max-width:100%;padding:27px 24px 26px}.command-copy h2{font-size:31px}.command-image{flex:auto;width:100%;min-height:225px;background-size:cover;background-position:center 68%;opacity:1}.command-image:after{background:linear-gradient(180deg,#06142240,transparent 22%,#06142238)}.hero-corner{display:none}
+ .tractor-gallery{gap:10px;flex-wrap:wrap;margin:13px 0 22px}.tractor-photo{flex:1 1 calc(50% - 5px);height:123px}.tractor-photo>span{font-size:9px;left:11px;bottom:10px}
+ .identity-card{flex-direction:column;gap:25px;padding:22px}.identity-preview{flex:auto;min-width:0;min-height:160px}.identity-preview>.brand{max-width:250px;width:100%;align-self:center}.identity-controls .btn{width:100%}.brand-photos{padding:21px 18px}
+ .machine-actions>.btn.btn-danger{flex-basis:100%;order:5;min-height:42px}.delete-machine-card{padding:24px 20px}.delete-heading h2{font-size:17px;line-height:1.5}.delete-identifiers{gap:18px;margin:21px 0}.delete-identifiers>div{min-width:100%;flex:1}.delete-machine-form>div:first-of-type{max-width:none}.delete-buttons{flex-direction:column-reverse}.delete-buttons>.btn{width:100%;min-height:44px}.delete-explanation{font-size:12px}
+ .login-intro:before{background-size:cover;background-position:center 60%;opacity:.5}.login-intro:after{background:linear-gradient(90deg,#071727ee,#07172760)}
+}
+@media print{.tractor-gallery,.identity-card,.delete-machine-form{display:none!important}}

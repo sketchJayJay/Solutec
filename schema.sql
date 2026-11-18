@@ -1,4 +1,5 @@
-PRAGMA foreign_keys = ON;
+
+    PRAGMA foreign_keys = ON;
 
     CREATE TABLE IF NOT EXISTS resellers(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -93,14 +94,19 @@ PRAGMA foreign_keys = ON;
         item_text TEXT NOT NULL,
         FOREIGN KEY (order_id) REFERENCES service_orders(id) ON DELETE CASCADE
     );
+    
 
-CREATE TABLE IF NOT EXISTS schema_migrations(
+        CREATE TABLE IF NOT EXISTS schema_migrations(
             name TEXT PRIMARY KEY, applied_at TEXT DEFAULT CURRENT_TIMESTAMP
         );
         CREATE TABLE IF NOT EXISTS maintenance_events(
             id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER,
             action TEXT NOT NULL, record_id INTEGER, details TEXT,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS company_branding(
+            id INTEGER PRIMARY KEY CHECK(id=1), logo_filename TEXT NOT NULL,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
         );
         CREATE INDEX IF NOT EXISTS idx_machines_client ON machines(client_id);
         CREATE INDEX IF NOT EXISTS idx_machines_reseller ON machines(reseller_id);
@@ -109,3 +115,4 @@ CREATE TABLE IF NOT EXISTS schema_migrations(
         CREATE INDEX IF NOT EXISTS idx_orders_reseller ON service_orders(reseller_id);
         CREATE INDEX IF NOT EXISTS idx_order_items_order ON service_items(order_id);
         CREATE INDEX IF NOT EXISTS idx_photos_machine ON machine_photos(machine_id);
+    

@@ -1,4 +1,16 @@
-# Solutec - revisão de 16/11/2026
+# Solutec - revisão de 18/11/2026
+
+## Atualização 3.2 — exclusão e identidade visual
+
+Criada a opção **Excluir máquina** para a matriz, na ficha e na conferência das máquinas sem cliente. A página mostra a identificação do equipamento e a quantidade de vínculos antes da confirmação pelo número do cadastro. A exclusão faz backup consistente antes de escrever, remove a ficha e os registros dos anexos, desvincula as OS e mantém seus itens, observações e clientes. Os arquivos físicos e o registro administrativo ficam preservados para recuperação. Falhas no backup impedem a exclusão; falhas durante a transação desfazem as mudanças.
+
+A atualização apenas disponibiliza a função: a máquina #1 não foi excluída automaticamente e os arquivos originais de `seed/` continuam inalterados.
+
+As quatro fotografias recebidas foram convertidas para WebP e incluídas no painel e na galeria. O login e a apresentação decorativa das fichas passaram a usar fotografias reais. Elas não foram atribuídas como fotos de máquinas de clientes.
+
+O arquivo oficial da logo da Solutec não veio entre os anexos. Foi criada a tela **Identidade visual** para a matriz carregar, trocar ou remover a marca, que aparece no menu, login e cabeçalhos impressos. A logo é persistida no volume de dados e incluída no backup completo. Até o envio, a identificação em texto da Solutec é exibida; Bruthor continua identificado como fabricante.
+
+**143 testes automatizados passaram** na versão 3.2. A nova cobertura verifica exclusão de órfãos e arquivados, confirmação, acesso administrativo, CSRF, preservação dos registros e arquivos, backup anterior, rollback em falhas, logo persistente, validação de upload, acesso à marca ativa, remoção e backup da identidade.
 
 ## Atualização 3.1 - OS e cabeçalhos
 
@@ -39,7 +51,7 @@ Os dados originais não foram excluídos nem tiveram a propriedade alterada. A c
 
 O cadastro #1 é a máquina que aumentava o total sem aparecer na listagem. O contador usava a tabela de máquinas, enquanto a lista exigia que o cliente existisse (`INNER JOIN`). Agora a lista usa o vínculo opcional e mostra a pendência.
 
-Há forte indício de cadastro antigo duplicado do equipamento da ficha #2, mas o proprietário do registro #1 não foi presumido. Consulte a ficha #1 para comparar com a #2. Após conferir os documentos, o administrador pode corrigir o proprietário ou arquivar o cadastro com motivo e confirmação do número. Arquivar é reversível e preserva os dados, documentos e OS.
+Há forte indício de cadastro antigo duplicado do equipamento da ficha #2, mas o proprietário do registro #1 não foi presumido. Consulte a ficha #1 para comparar com a #2. Após conferir os documentos, o administrador pode corrigir o proprietário, arquivar o cadastro ou usar Excluir máquina após conferir sua identidade. Arquivar é reversível e preserva os dados, documentos e OS.
 
 ## Outras pendências reais encontradas
 
@@ -84,7 +96,7 @@ A identificação da matriz foi atualizada na versão 3.1 com o CNPJ e o telefon
 
 ## Validação
 
-**122 testes automatizados passaram**, sem falhas. Cobrem páginas existentes, busca, cadastro/edição, valores inválidos, duplicidade, observações, upload/PDF, remoção de anexos, OS, isolamento das revendas, sessão, formulários, backup, arquivamento/restauração, migrações, banco novo, troca de proprietário, QR Code e senha administrativa.
+**143 testes automatizados passaram**, sem falhas. Cobrem páginas existentes, busca, cadastro/edição, valores inválidos, duplicidade, observações, upload/PDF, remoção de anexos, OS, isolamento das revendas, sessão, formulários, backup, arquivamento/restauração, migrações, banco novo, troca de proprietário, QR Code e senha administrativa.
 
 Também foi iniciado o Gunicorn com dois workers e `--preload`: health, login, CSS e JavaScript responderam HTTP 200. A ficha da máquina e a OS usadas na revisão foram renderizadas em A4 com uma página cada.
 

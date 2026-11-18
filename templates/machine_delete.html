@@ -1,0 +1,11 @@
+{% extends 'base.html' %}
+{% block title %}Excluir máquina #{{ m.id }} · Solutec{% endblock %}
+{% block body %}
+<div class="page-header"><div><div class="eyebrow">CADASTRO #{{ '%03d'|format(m.id) }}</div><h1>Excluir máquina<span class="title-dot">.</span></h1><p>Confira o equipamento antes de confirmar a remoção.</p></div><a class="btn" href="{{ url_for('machine_detail',machine_id=m.id) }}">Voltar à ficha</a></div>
+<section class="card delete-machine-card">
+  <div class="delete-heading"><span class="delete-symbol">{{ icon('trash') }}</span><div><h2>{{ m.name }}</h2><p class="section-sub">{{ m.client_name or 'Sem vínculo com cliente' }}</p></div></div>
+  <dl class="delete-identifiers"><div><dt>Número de série</dt><dd>{{ m.serial_number or 'Não informado' }}</dd></div><div><dt>Número do motor</dt><dd>{{ m.engine_number or 'Não informado' }}</dd></div><div><dt>Revenda</dt><dd>{{ m.reseller_name or 'Não encontrada' }}</dd></div></dl>
+  <div class="delete-explanation"><p>A máquina sai do inventário e sua ficha é removida. Os clientes continuam cadastrados.</p><p>As OS vinculadas ({{ orders|length }}) serão mantidas, com os serviços e observações, sem vínculo com esta máquina. Os anexos ({{ photos|length }}) sairão da ficha.</p><p>Uma cópia anterior do banco e os arquivos originais ficam guardados para recuperação administrativa.</p></div>
+  <form method="post" class="delete-machine-form"><input type="hidden" name="_csrf" value="{{ csrf_token() }}"><div><label for="delete-confirmation">Digite {{ m.id }} para confirmar</label><input id="delete-confirmation" name="confirmation" required pattern="{{ m.id }}" inputmode="numeric" autocomplete="off" placeholder="Número da máquina"></div><div class="delete-buttons"><a class="btn" href="{{ url_for('machine_detail',machine_id=m.id) }}">Cancelar</a><button class="btn btn-danger" type="submit">{{ icon('trash') }}Excluir máquina #{{ m.id }}</button></div></form>
+</section>
+{% endblock %}

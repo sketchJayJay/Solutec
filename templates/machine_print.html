@@ -137,14 +137,14 @@
       .machine-id,.os-id { text-align:left; margin-top:10px; }
     }
     @media print { .page { padding:0; } .header { print-color-adjust:exact; } }
-  </style>
+  .company-print-logo{background:#fff;border-radius:8px;padding:6px;max-height:82px;object-fit:contain}.print-brand-fallback{font-size:19px;font-weight:800;letter-spacing:1px;color:#fff}.print-brand-fallback>span{color:#ffab36}</style>
 </head>
 <body onload="window.print()">
   <div class="page">
     <div class="header">
       <div class="brand">
         <div class="brand-logo">
-          <img src="{{ url_for('static', filename='logo-brand.png') }}" alt="Solutec">
+          {% if company.logo_url %}<img class="company-print-logo" src="{{ company.logo_url }}" alt="Solutec">{% else %}<span class="print-brand-fallback">SOLUTEC<span>.</span></span>{% endif %}
         </div>
         <div>
           {% set issuer_reseller=m.reseller_name %}{% include 'company_print_header.html' %}

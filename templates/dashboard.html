@@ -60,4 +60,5 @@
     <section class="access-card card"><details><summary>{{ icon('pin') }}Leve a Solutec com você<span>+</span></summary><div class="qr-content"><img src="{{ url_for('access_qr') }}" alt="QR Code para acessar a Solutec"><p>Abra a câmera do celular e leia o QR Code.<strong>{{ base_url }}</strong></p></div></details></section>
   </div>
 </div>
+<section class="card brand-photos"><div class="section-header"><div><h2>Equipamentos Solutec</h2><p class="section-sub">Fotos dos tratores da empresa</p></div></div>{% include 'tractor_gallery.html' %}</section>
 {% endblock %}

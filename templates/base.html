@@ -17,7 +17,7 @@
 {% if g.user %}
 <button class="nav-scrim" aria-label="Fechar menu" tabindex="-1"></button>
 <aside class="sidebar" id="navigation" aria-label="Menu principal">
-  <a class="brand" href="{{ url_for('dashboard') }}"><span class="brand-mark">S<span></span><i></i></span><span><strong>SOLUTEC<span class="brand-dot">.</span></strong><small>IMPLEMENTOS AGRÍCOLAS</small></span></a>
+  <a class="brand" href="{{ url_for('dashboard') }}">{% include 'brand_identity.html' %}</a>
   <div class="workspace-chip"><span class="workspace-avatar">{{ 'M' if g.user.role=='admin' else 'R' }}</span><div><strong>{{ 'Solutec Matriz' if g.user.role=='admin' else (g.user.reseller_fantasy or g.user.reseller_razao or 'Revenda') }}</strong><small>{{ 'Visão administrativa' if g.user.role=='admin' else 'Revenda autorizada' }}</small></div><span class="online-dot" title="Sessão ativa"></span></div>
   <div class="nav-label">OPERAÇÃO</div>
   <nav class="side-nav">
@@ -28,7 +28,7 @@
     {% if g.user.role=='admin' %}<a href="{{ url_for('resellers') }}" {% if request.endpoint=='resellers' %}class="active" aria-current="page"{% endif %}>{{ icon('store') }}Revendas</a>{% endif %}
   </nav>
   {% if g.user.role=='admin' %}
-  <div class="nav-label">ADMINISTRAÇÃO</div><nav class="side-nav"><a href="{{ url_for('diagnostics') }}" {% if request.endpoint=='diagnostics' %}class="active" aria-current="page"{% endif %}>{{ icon('check') }}Conferir cadastros</a></nav>
+  <div class="nav-label">ADMINISTRAÇÃO</div><nav class="side-nav"><a href="{{ url_for('diagnostics') }}" {% if request.endpoint=='diagnostics' %}class="active" aria-current="page"{% endif %}>{{ icon('check') }}Conferir cadastros</a><a href="{{ url_for('company_identity') }}" {% if request.endpoint=='company_identity' %}class="active" aria-current="page"{% endif %}>{{ icon('image') }}Identidade visual</a></nav>
   <form action="{{ url_for('backup_download') }}" method="post" class="backup-nav"><input type="hidden" name="_csrf" value="{{ csrf_token() }}"><button type="submit">{{ icon('backup') }}Baixar backup completo</button></form>
   {% endif %}
   <div class="sidebar-bottom"><div class="dealer-logo"><img src="{{ url_for('static',filename='logo-brand.png') }}" alt="Bruthor Tratores"></div><div class="account"><span class="account-avatar">{{ g.user.email[0]|upper }}</span><div><strong>{{ 'Administrador' if g.user.role=='admin' else 'Revenda' }}</strong><small title="{{ g.user.email }}">{{ g.user.email }}</small></div><a href="{{ url_for('logout') }}" aria-label="Sair da conta" title="Sair">{{ icon('logout') }}</a></div></div>

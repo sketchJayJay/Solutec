@@ -1,0 +1,3 @@
+<div class="tractor-gallery">
+{% for file,label,position in [('tractor-trailer.webp','Trator e carreta','trailer'),('tractor-yard.webp','Trator no pátio','yard'),('tractor-detail.webp','Equipamento Solutec','detail'),('tractor-loader.webp','Trator com carregador','loader')] %}<a class="tractor-photo {{ position }}" href="{{ url_for('static',filename='solutec/'~file) }}" target="_blank" rel="noopener"><img src="{{ url_for('static',filename='solutec/'~file) }}" alt="{{ label }} — foto fornecida pela Solutec" loading="lazy"><span>{{ label }}{{ icon('arrow') }}</span></a>{% endfor %}
+</div>

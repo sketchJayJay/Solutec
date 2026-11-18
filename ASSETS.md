@@ -1,7 +1,14 @@
-# Recursos visuais
+# Recursos visuais — Solutec 3.2
 
-`static/hero-tractor-v3.webp` é uma imagem decorativa criada para a identidade do sistema. Não é a fotografia de uma máquina cadastrada nem identifica um modelo comercial específico. A imagem foi gerada por ImageGen e otimizada em WebP para uso local, sem dependência de outro site.
+As fotografias da pasta `static/solutec/` foram fornecidas pelo usuário em 18/11/2026. Foram convertidas para WebP, sem gerar tratores, alterar elementos da imagem ou atribuir as fotos a cadastros de clientes. O recorte de exibição é feito apenas pelo layout, e as miniaturas abrem a fotografia completa.
 
-Prompt de criação: trator agrícola azul em fotografia de estúdio 3D realista, iluminação azul e âmbar, composição horizontal com o veículo na metade direita e espaço azul-marinho escuro na esquerda para texto HTML; sem pessoas, texto, marca ou elementos de interface.
+| Arquivo | Imagem recebida |
+| --- | --- |
+| `tractor-trailer.webp` | `0d4564db-8e6a-41d5-9391-6c7dd086abb1.jpeg` — trator com carreta |
+| `tractor-yard.webp` | `12a02e04-5760-40d0-936c-4e3f18c56686.jpeg` — trator no pátio |
+| `tractor-detail.webp` | `0e9df1e8-b9ba-4176-a9bd-1aaad740a622.jpeg` — detalhe do trator |
+| `tractor-loader.webp` | `77969f6f-a45e-495b-a705-4bf0804ed3dc.jpeg` — trator com carregador |
 
-Os logos Bruthor em `static/logo.png` e `static/logo-brand.png` foram preservados do material original. Os ícones permanecem em SVG e as informações do sistema são elementos HTML reais.
+A antiga imagem gerada foi substituída pelas fotografias reais no painel, login e capa decorativa das fichas. As fotos e os documentos efetivamente vinculados a cada máquina continuam em sua área de anexos.
+
+Os logos Bruthor do material original continuam como identificação da fabricante. Não são a logo da Solutec. Não foi recebido um arquivo separado da marca Solutec neste pedido: até seu envio, o sistema usa a identificação em texto. O administrador pode enviar a logo em **Identidade visual**; ela é guardada no volume persistente, aparece no login, menu e impressões e acompanha o backup completo.

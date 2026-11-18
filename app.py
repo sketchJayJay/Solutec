@@ -249,6 +249,10 @@ def init_db():
             action TEXT NOT NULL, record_id INTEGER, details TEXT,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         );
+        CREATE TABLE IF NOT EXISTS company_branding(
+            id INTEGER PRIMARY KEY CHECK(id=1), logo_filename TEXT NOT NULL,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        );
         CREATE INDEX IF NOT EXISTS idx_machines_client ON machines(client_id);
         CREATE INDEX IF NOT EXISTS idx_machines_reseller ON machines(reseller_id);
         CREATE INDEX IF NOT EXISTS idx_clients_reseller ON clients(reseller_id);
@@ -643,6 +647,101 @@ def machine_edit(machine_id):
     return save_machine(machine_id)
 
 
+@app.route('/machines/<int:machine_id>/delete', methods=['GET','POST'])
+@admin_required
+def machine_delete(machine_id):
+    con=connect()
+    machine=get_machine(con,machine_id)
+    orders=[dict(row) for row in con.execute('SELECT id,client_id FROM service_orders WHERE machine_id=? ORDER BY id',(machine_id,))]
+    photos=[dict(row) for row in con.execute('SELECT * FROM machine_photos WHERE machine_id=?',(machine_id,))]
+    if request.method=='POST':
+        if request.form.get('confirmation','').strip()!=str(machine_id):
+            con.close()
+            flash('Digite o número da máquina para confirmar a exclusão.','error')
+            return render_template('machine_delete.html',m=machine,orders=orders,photos=photos),400
+        try:
+            snapshot(DB_PATH,Path(DATA_DIR)/'backups','antes-excluir-maquina')
+            # Desvincula as OS explicitamente para preservar bancos legados.
+            con.execute('UPDATE service_orders SET machine_id=NULL WHERE machine_id=?',(machine_id,))
+            con.execute('DELETE FROM machine_photos WHERE machine_id=?',(machine_id,))
+            con.execute('DELETE FROM machines WHERE id=?',(machine_id,))
+            record_event(con,'excluir_maquina',machine_id,{'machine':machine,'photos':photos,'orders':orders})
+            con.commit()
+        except Exception:
+            con.rollback()
+            raise
+        finally:
+            con.close()
+        flash('Máquina excluída. Clientes e OS foram preservados; a cópia anterior e os arquivos continuam guardados.','success')
+        return redirect(url_for('machines_list'))
+    con.close()
+    return render_template('machine_delete.html',m=machine,orders=orders,photos=photos)
+
+
+def current_brand_logo(con):
+    row=con.execute('SELECT logo_filename FROM company_branding WHERE id=1').fetchone()
+    name=row['logo_filename'] if row else None
+    if name and re.fullmatch(r'logo-[0-9a-f]{32}\.(?:png|jpg|jpeg|webp)',name):
+        path=Path(UPLOAD_DIR)/'company_brand'/name
+        if path.is_file() and not path.is_symlink():
+            return name
+    return None
+
+
+@app.route('/brand/<filename>')
+def brand_logo(filename):
+    con=connect()
+    current=current_brand_logo(con)
+    con.close()
+    if filename!=current:
+        abort(404)
+    # Só a logo institucional selecionada é pública, inclusive no login.
+    return send_from_directory(Path(UPLOAD_DIR)/'company_brand',filename)
+
+
+@app.route('/admin/identidade',methods=['GET','POST'])
+@admin_required
+def company_identity():
+    if request.method=='POST':
+        file=request.files.get('logo')
+        con=connect()
+        previous=current_brand_logo(con)
+        if request.form.get('action')=='remove':
+            con.execute('DELETE FROM company_branding WHERE id=1')
+            record_event(con,'remover_logo',1,{'previous':previous})
+            con.commit();con.close()
+            flash('Logo removida. A identificação em texto voltou a ser exibida.','success')
+            return redirect(url_for('company_identity'))
+        content=file.read(2*1024*1024+1) if file and file.filename else b''
+        ext=Path(file.filename).suffix.lower() if file and file.filename else ''
+        valid=((ext=='.png' and content.startswith(b'\x89PNG\r\n\x1a\n')) or
+               (ext in ('.jpg','.jpeg') and content.startswith(b'\xff\xd8\xff')) or
+               (ext=='.webp' and content[:4]==b'RIFF' and content[8:12]==b'WEBP'))
+        error=None
+        if not content:error='Selecione o arquivo da logo da Solutec.'
+        elif len(content)>2*1024*1024:error='A logo deve ter até 2 MB.'
+        elif not valid:error='Envie a logo em PNG, JPG ou WebP.'
+        if error:
+            con.close();flash(error,'error')
+            return render_template('company_identity.html'),400
+        name='logo-'+uuid.uuid4().hex+ext
+        path=Path(UPLOAD_DIR)/'company_brand'/name
+        path.parent.mkdir(parents=True,exist_ok=True)
+        try:
+            path.write_bytes(content)
+            con.execute('INSERT INTO company_branding(id,logo_filename,updated_at) VALUES (1,?,CURRENT_TIMESTAMP) ON CONFLICT(id) DO UPDATE SET logo_filename=excluded.logo_filename,updated_at=excluded.updated_at',(name,))
+            record_event(con,'atualizar_logo',1,{'previous':previous,'filename':name})
+            con.commit()
+        except Exception:
+            con.rollback();path.unlink(missing_ok=True)
+            raise
+        finally:
+            con.close()
+        flash('Logo atualizada no menu, login e impressões.','success')
+        return redirect(url_for('company_identity'))
+    return render_template('company_identity.html')
+
+
 @app.route("/machines/<int:machine_id>", methods=["GET", "POST"])
 @login_required
 def machine_detail(machine_id):
@@ -951,12 +1050,14 @@ def interface_helpers():
             if row:
                 profile['cnpj']=row['cnpj'] or COMPANY_CNPJ
                 profile['phone']=row['phone'] or COMPANY_PHONE
+            logo=current_brand_logo(con)
+            profile['logo_url']=url_for('brand_logo',filename=logo) if logo else None
         finally:
             con.close()
         phone=normalize_phone(profile['phone'])
         profile['phone_href']='tel:+'+phone if phone else None
         g.company_profile=profile
-    return {'csrf_token':csrf_token,'today':datetime.date.today(),'app_version':'3.1','company':g.company_profile}
+    return {'csrf_token':csrf_token,'today':datetime.date.today(),'app_version':'3.2','company':g.company_profile}
 
 
 @app.template_filter('brdate')

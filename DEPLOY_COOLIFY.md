@@ -1,4 +1,4 @@
-# Solutec 3.1 no Coolify
+# Solutec 3.2 no Coolify
 
 ## Escolha do pacote
 
@@ -45,6 +45,7 @@ Se usar o pacote sem dados em uma primeira instalação, o sistema inicia vazio.
 
 - `/data/solutec.db`: banco em uso.
 - `/data/uploads`: documentos e fotos, incluindo os nomes antigos.
+- `/data/uploads/company_brand`: logos enviados pela administração; a seleção ativa fica no banco e acompanha o backup.
 - `/data/backups`: cópias anteriores a migração, edição administrativa ou exclusão.
 - `/data/.session-key`: chave local de sessão gerada somente quando `SECRET_KEY` não foi configurada.
 - Uma instância da aplicação, com dois workers do Gunicorn. Não escale para múltiplas réplicas com volumes separados.
@@ -80,3 +81,9 @@ Para restaurar, pare a aplicação, preserve uma cópia do volume atual e restau
 Ao iniciar esta versão, a identificação da Solutec Matriz é atualizada para CNPJ `45.154.368/0001-42` e telefone `(32) 9 9988-5977`. A alteração é registrada uma única vez, com cópia anterior do banco. Ela não altera a identificação das outras revendas, senhas, clientes, máquinas ou OS.
 
 A aba **Ordens de serviço** está disponível no menu lateral e no atalho **OS** do celular. Não há variável nova de ambiente para esta atualização.
+
+## Atualização 3.2
+
+Não exige novas variáveis de ambiente. Mantenha o volume `/data` e a `SECRET_KEY`. A tabela institucional é criada de forma aditiva; nenhuma máquina é removida no deploy. A exclusão depende da ação explícita da matriz na ficha, com confirmação e cópia anterior do banco.
+
+Depois de atualizar, use **Identidade visual** para carregar a logo oficial. As quatro fotos fornecidas já estão no código. Os logos enviados depois ficam no volume persistente e são incluídos no backup completo.

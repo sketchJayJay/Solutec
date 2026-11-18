@@ -1,3 +1,12 @@
+# Solutec 3.2 — 18/11/2026
+
+- Opção Excluir máquina na ficha e na conferência administrativa de máquinas sem cliente.
+- Revisão do cadastro e confirmação do número antes de remover. Cópia consistente do banco antes da exclusão; clientes, OS, itens e arquivos originais preservados.
+- Registro administrativo com os dados da máquina removida e seus vínculos.
+- Fotografias reais fornecidas pela Solutec no painel, login e apresentação das fichas; galeria com acesso às quatro imagens completas.
+- Identidade visual: envio, substituição e remoção da logo pela matriz. Marca aplicada no menu, login e cabeçalhos impressos, com persistência e backup.
+- Nenhuma máquina é excluída automaticamente pela atualização. A logo oficial não foi recebida entre as quatro fotografias.
+
 # Solutec 3.1 - ordens de serviço e identificação
 
 - Aba exclusiva de OS no menu do computador e do celular.
