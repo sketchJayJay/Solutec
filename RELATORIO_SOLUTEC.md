@@ -1,5 +1,15 @@
 # Solutec - revisão de 18/11/2026
 
+## Atualização 3.3 — fotografias no inventário
+
+As capas dos cards de Máquinas agora usam as fotografias da Solutec. O botão **Trocar foto** permite escolher pela imagem, entre quatro referências ou uma fotografia anexada àquela máquina. A ficha também oferece **Foto de capa**. A referência é identificada como tal, sem presumir modelos ou a identidade do equipamento fotografado.
+
+No modo automático, uma foto própria disponível tem prioridade; sem ela, os cadastros Bruthor usam a referência padrão da empresa. PDFs, fotos ausentes e arquivos de outras máquinas não podem ser escolhidos como capa. A escolha é persistente, pode ser alterada depois e respeita os acessos das revendas. A remoção do anexo usado como capa limpa a seleção e devolve o modo automático.
+
+A migração adiciona apenas `cover_image` à tabela de máquinas e faz backup antes da alteração. Os dados originais de `seed/` continuam inalterados, e nenhuma ficha recebe modelo ou proprietário por inferência visual.
+
+**162 testes automatizados passaram** na versão 3.3, incluindo a nova escolha de capas, persistência, preservação dos dados cadastrais, preferência por foto própria, descarte de PDF/arquivo ausente, autorização por revenda, CSRF e migração aditiva. A revisão visual estática cobriu cards e seletor de fotos em tamanhos de computador e celular.
+
 ## Atualização 3.2 — exclusão e identidade visual
 
 Criada a opção **Excluir máquina** para a matriz, na ficha e na conferência das máquinas sem cliente. A página mostra a identificação do equipamento e a quantidade de vínculos antes da confirmação pelo número do cadastro. A exclusão faz backup consistente antes de escrever, remove a ficha e os registros dos anexos, desvincula as OS e mantém seus itens, observações e clientes. Os arquivos físicos e o registro administrativo ficam preservados para recuperação. Falhas no backup impedem a exclusão; falhas durante a transação desfazem as mudanças.
@@ -96,7 +106,7 @@ A identificação da matriz foi atualizada na versão 3.1 com o CNPJ e o telefon
 
 ## Validação
 
-**143 testes automatizados passaram**, sem falhas. Cobrem páginas existentes, busca, cadastro/edição, valores inválidos, duplicidade, observações, upload/PDF, remoção de anexos, OS, isolamento das revendas, sessão, formulários, backup, arquivamento/restauração, migrações, banco novo, troca de proprietário, QR Code e senha administrativa.
+**162 testes automatizados passaram**, sem falhas. Cobrem páginas existentes, busca, cadastro/edição, valores inválidos, duplicidade, observações, upload/PDF, remoção de anexos, OS, isolamento das revendas, sessão, formulários, backup, arquivamento/restauração, migrações, banco novo, troca de proprietário, QR Code e senha administrativa.
 
 Também foi iniciado o Gunicorn com dois workers e `--preload`: health, login, CSS e JavaScript responderam HTTP 200. A ficha da máquina e a OS usadas na revisão foram renderizadas em A4 com uma página cada.
 

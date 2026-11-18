@@ -1,3 +1,12 @@
+# Solutec 3.3 — fotos nas capas das máquinas
+
+- Cards do inventário exibem as fotos enviadas pela Solutec.
+- Fotos compartilhadas aparecem como Foto de referência; modelos e proprietários não são inferidos pela aparência.
+- Trocar foto em cada card e Foto de capa na ficha, com escolha entre as quatro referências, fotos próprias anexadas e ícone sem fotografia.
+- Modo automático prioriza a foto própria disponível mais recente e usa uma referência para tratores Bruthor sem fotografia.
+- A escolha individual é persistida no volume. A atualização adiciona apenas o campo de apresentação, com backup anterior à migração.
+- Fotos privadas respeitam o acesso por revenda e só podem ser escolhidas para a máquina à qual estão anexadas.
+
 # Solutec 3.2 — 18/11/2026
 
 - Opção Excluir máquina na ficha e na conferência administrativa de máquinas sem cliente.

@@ -1,4 +1,4 @@
-# Solutec 3.2 no Coolify
+# Solutec 3.3 no Coolify
 
 ## Escolha do pacote
 
@@ -87,3 +87,9 @@ A aba **Ordens de serviço** está disponível no menu lateral e no atalho **OS*
 Não exige novas variáveis de ambiente. Mantenha o volume `/data` e a `SECRET_KEY`. A tabela institucional é criada de forma aditiva; nenhuma máquina é removida no deploy. A exclusão depende da ação explícita da matriz na ficha, com confirmação e cópia anterior do banco.
 
 Depois de atualizar, use **Identidade visual** para carregar a logo oficial. As quatro fotos fornecidas já estão no código. Os logos enviados depois ficam no volume persistente e são incluídos no backup completo.
+
+## Atualização 3.3
+
+Mantenha o volume e as variáveis existentes. A primeira inicialização adiciona `machines.cover_image`, com cópia anterior consistente do banco. O campo guarda apenas a escolha de apresentação. As máquinas antigas recebem a referência visual na renderização, sem atualização dos seus modelos ou anexos.
+
+Após atualizar, abra **Máquinas** e confira as fotografias nos cards. Use **Trocar foto** para mudar cada capa. A escolha e as fotos próprias ficam no volume persistente e acompanham o backup completo.

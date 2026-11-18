@@ -10,6 +10,12 @@ COMPANY_NAME = 'Solutec Implementos Agrícolas'
 COMPANY_CNPJ = '45.154.368/0001-42'
 COMPANY_PHONE = '(32) 9 9988-5977'
 COMPANY_MIGRATION = '2026-11-16-company-identity-v1'
+MACHINE_REFERENCE_PHOTOS = {
+    'trailer': ('tractor-trailer.webp', 'Trator e carreta'),
+    'yard': ('tractor-yard.webp', 'Trator no pátio'),
+    'detail': ('tractor-detail.webp', 'Trator em destaque'),
+    'loader': ('tractor-loader.webp', 'Trator com carregador'),
+}
 
 BASEDIR = os.path.abspath(os.path.dirname(__file__))
 DATA_DIR = os.environ.get("SOLUTEC_DATA_DIR", os.path.join(BASEDIR, "data"))
@@ -131,7 +137,7 @@ def init_db():
         has_migrations = probe.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='schema_migrations'").fetchone()
         company_pending = not has_migrations or not probe.execute('SELECT 1 FROM schema_migrations WHERE name=?',(COMPANY_MIGRATION,)).fetchone()
         probe.close()
-        if columns and (company_pending or not {"obs", "archived_at", "archive_reason"}.issubset(columns)):
+        if columns and (company_pending or not {"obs", "archived_at", "archive_reason", "cover_image"}.issubset(columns)):
             snapshot(DB_PATH, os.path.join(DATA_DIR, "backups"), "antes-atualizacao")
     con = connect()
     cur = con.cursor()
@@ -195,6 +201,7 @@ def init_db():
         obs TEXT,
         archived_at TEXT,
         archive_reason TEXT,
+        cover_image TEXT,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (reseller_id) REFERENCES resellers(id) ON DELETE CASCADE,
         FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
@@ -235,7 +242,7 @@ def init_db():
 
     # Migrações aditivas: não altera nem exclui os cadastros legados.
     columns = {r["name"] for r in cur.execute("PRAGMA table_info(machines)")}
-    for name, kind in (("obs", "TEXT"), ("archived_at", "TEXT"), ("archive_reason", "TEXT")):
+    for name, kind in (("obs", "TEXT"), ("archived_at", "TEXT"), ("archive_reason", "TEXT"), ("cover_image", "TEXT")):
         if name not in columns:
             cur.execute(f"ALTER TABLE machines ADD COLUMN {name} {kind}")
     if "obs_text" in columns:
@@ -616,7 +623,6 @@ def client_delete(client_id):
 def machines_list():
     con = connect()
     rows, duplicates = machine_rows(con, scope_id())
-    con.close()
     q = request.args.get('q', '').strip()
     status = request.args.get('status', 'active')
     counts = {'active':sum(not r['archived_at'] for r in rows),
@@ -631,6 +637,10 @@ def machines_list():
     if q:
         query = search_text(q)
         rows = [r for r in rows if query in search_text(' '.join(str(r.get(k) or '') for k in ('id','name','brand','model','client_name','serial_number','engine_number','nf_number','reseller_name')))]
+    photos=cover_photo_options(con)
+    for row in rows:
+        row['cover']=resolve_machine_cover(row,photos.get(row['id'],[]))
+    con.close()
     return render_template('machines_list.html', rows=rows, q=q, status=status, counts=counts)
 
 
@@ -645,6 +655,79 @@ def machine_new():
 @login_required
 def machine_edit(machine_id):
     return save_machine(machine_id)
+
+
+def cover_photo_options(con,machine_id=None):
+    sql='SELECT p.* FROM machine_photos p JOIN machines m ON m.id=p.machine_id WHERE 1=1'
+    params=[]
+    if scope_id() is not None:
+        sql+=' AND m.reseller_id=?';params.append(scope_id())
+    if machine_id is not None:
+        sql+=' AND m.id=?';params.append(machine_id)
+    photos={}
+    for row in con.execute(sql+' ORDER BY p.id DESC',params):
+        if Path(row['filename']).suffix.lower() not in ('.jpg','.jpeg','.png','.gif','.webp'):
+            continue
+        if attachment_path(UPLOAD_DIR,row['filename']) is None:
+            continue
+        photos.setdefault(row['machine_id'],[]).append({
+            'choice':'photo:'+str(row['id']), 'url':url_for('uploads',filename=row['filename']),
+            'label':re.sub(r'^(?:[0-9a-f]{32}|[0-9]{14})_', '',Path(row['filename']).name),
+            'kind':'photo', 'style':'own-photo',
+        })
+    return photos
+
+
+def reference_cover(key):
+    file,label=MACHINE_REFERENCE_PHOTOS[key]
+    return {'choice':'reference:'+key,'url':url_for('static',filename='solutec/'+file),
+            'label':label,'kind':'reference','style':key}
+
+
+def resolve_machine_cover(machine,photos):
+    choice=machine.get('cover_image')
+    if choice=='none':return None
+    own=next((photo for photo in photos if photo['choice']==choice),None)
+    if own:return own
+    if choice and choice.startswith('reference:') and choice[10:] in MACHINE_REFERENCE_PHOTOS:
+        return reference_cover(choice[10:])
+    if photos:return photos[0]
+    # Uma referência visual não identifica o modelo nem a unidade do cliente.
+    if 'bruthor' in search_text(str(machine.get('brand') or '')+' '+str(machine.get('name') or '')):
+        return reference_cover('trailer')
+    return None
+
+
+@app.route('/machines/<int:machine_id>/cover',methods=['GET','POST'])
+@login_required
+def machine_cover(machine_id):
+    con=connect()
+    machine=get_machine(con,machine_id)
+    photos=cover_photo_options(con,machine_id).get(machine_id,[])
+    references=[reference_cover(key) for key in MACHINE_REFERENCE_PHOTOS]
+    allowed={'auto','none'}|{p['choice'] for p in photos+references}
+    selected=machine.get('cover_image') or 'auto'
+    if selected not in allowed:selected='auto'
+    code=200
+    if request.method=='POST':
+        choice=request.form.get('cover_choice','')
+        if choice not in allowed:
+            flash('Escolha uma das fotos disponíveis para esta máquina.','error')
+            code=400
+        else:
+            try:
+                con.execute('UPDATE machines SET cover_image=? WHERE id=?',(None if choice=='auto' else choice,machine_id))
+                record_event(con,'alterar_capa_maquina',machine_id,{'from':machine.get('cover_image'),'to':choice})
+                con.commit()
+            except Exception:
+                con.rollback()
+                raise
+            finally:
+                con.close()
+            flash('Foto de capa atualizada.','success')
+            return redirect(url_for('machines_list'))
+    con.close()
+    return render_template('machine_cover.html',m=machine,photos=photos,references=references,selected=selected),code
 
 
 @app.route('/machines/<int:machine_id>/delete', methods=['GET','POST'])
@@ -814,6 +897,7 @@ def machine_photo_delete(machine_id,photo_id):
     if not photo:
         con.close(); abort(404)
     snapshot(DB_PATH,Path(DATA_DIR)/'backups','antes-remover-anexo')
+    con.execute('UPDATE machines SET cover_image=NULL WHERE id=? AND cover_image=?',(machine_id,'photo:'+str(photo_id)))
     con.execute('DELETE FROM machine_photos WHERE id=?',(photo_id,))
     record_event(con,'remover_anexo',photo_id,{'filename':photo['filename'],'machine_id':machine_id})
     con.commit(); con.close()
@@ -1057,7 +1141,7 @@ def interface_helpers():
         phone=normalize_phone(profile['phone'])
         profile['phone_href']='tel:+'+phone if phone else None
         g.company_profile=profile
-    return {'csrf_token':csrf_token,'today':datetime.date.today(),'app_version':'3.2','company':g.company_profile}
+    return {'csrf_token':csrf_token,'today':datetime.date.today(),'app_version':'3.3','company':g.company_profile}
 
 
 @app.template_filter('brdate')

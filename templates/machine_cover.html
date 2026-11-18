@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+{% block title %}Foto da máquina #{{ m.id }} · Solutec{% endblock %}
+{% block body %}
+<div class="page-header"><div><div class="eyebrow">EQUIPAMENTO #{{ '%03d'|format(m.id) }}</div><h1>Foto de capa<span class="title-dot">.</span></h1><p>{{ m.name }} · Série {{ m.serial_number or 'não informada' }}</p></div><a class="btn" href="{{ url_for('machines_list') }}">Voltar às máquinas</a></div>
+<form method="post" class="cover-picker-form"><input type="hidden" name="_csrf" value="{{ csrf_token() }}">
+<section class="card cover-picker-card"><div class="section-header"><div><h2>Escolha como apresentar a máquina</h2><p class="section-sub">A foto aparece no card do inventário. Você pode mudar a escolha a qualquer momento.</p></div></div>
+<div class="cover-auto-options"><label><input type="radio" name="cover_choice" value="auto" {% if selected=='auto' %}checked{% endif %}><span><strong>Automático</strong><small>Usa a foto da ficha ou uma referência da Solutec.</small></span></label><label><input type="radio" name="cover_choice" value="none" {% if selected=='none' %}checked{% endif %}><span><strong>Sem fotografia</strong><small>Exibe o ícone do equipamento.</small></span></label></div>
+<div class="cover-section-heading"><h3>Fotos de referência da Solutec</h3><p>Imagens de referência, sem associação a um modelo específico.</p></div>
+<div class="cover-choice-grid">{% for option in references %}<label class="cover-choice"><input type="radio" name="cover_choice" value="{{ option.choice }}" {% if selected==option.choice %}checked{% endif %}><span class="cover-choice-image {{ option.style }}"><img src="{{ option.url }}" alt="{{ option.label }}"></span><span class="cover-choice-caption"><strong>{{ option.label }}</strong><small>Foto de referência</small></span></label>{% endfor %}</div>
+<div class="cover-section-heading"><h3>Fotos desta máquina</h3><p>Fotografias já anexadas à ficha deste equipamento.</p></div>
+{% if photos %}<div class="cover-choice-grid">{% for option in photos %}<label class="cover-choice"><input type="radio" name="cover_choice" value="{{ option.choice }}" {% if selected==option.choice %}checked{% endif %}><span class="cover-choice-image own-photo"><img src="{{ option.url }}" alt="Foto anexada à máquina #{{ m.id }}" loading="lazy"></span><span class="cover-choice-caption"><strong>{{ option.label }}</strong><small>Foto desta máquina</small></span></label>{% endfor %}</div>{% else %}<div class="cover-no-photos">{{ icon('image') }}<p>Esta ficha ainda não tem fotografias disponíveis.</p></div>{% endif %}
+<a class="text-link" href="{{ url_for('machine_detail',machine_id=m.id) }}#historico-anexos">Adicionar fotos na ficha {{ icon('arrow') }}</a>
+<div class="cover-picker-footer"><a class="btn" href="{{ url_for('machines_list') }}">Cancelar</a><button type="submit" class="btn primary">{{ icon('check') }}Salvar foto de capa</button></div>
+</section>
+</form>
+{% endblock %}

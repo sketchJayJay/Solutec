@@ -58,6 +58,7 @@
         obs TEXT,
         archived_at TEXT,
         archive_reason TEXT,
+        cover_image TEXT,
         created_at TEXT DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (reseller_id) REFERENCES resellers(id) ON DELETE CASCADE,
         FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
